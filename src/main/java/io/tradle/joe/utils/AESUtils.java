@@ -1,4 +1,4 @@
-package io.tradle.joe;
+package io.tradle.joe.utils;
 
 import org.bitcoinj.crypto.KeyCrypterException;
 import org.spongycastle.crypto.BufferedBlockCipher;
@@ -14,6 +14,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 
 /**
+ * From MultiBit-hd: https://github.com/bitcoin-solutions/multibit-hd/blob/develop/mbhd-brit/src/main/java/org/multibit/hd/brit/crypto/AESUtils.java
  * <p>Utility class to provide the following to BRIT API:</p>
  * <ul>
  * <li>Encryption and decryption using AES</li>

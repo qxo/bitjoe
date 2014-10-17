@@ -1,4 +1,4 @@
-package io.tradle.joe;
+package io.tradle.joe.utils;
 
 import com.google.common.base.Preconditions;
 import org.slf4j.Logger;
@@ -8,6 +8,8 @@ import java.io.*;
 import java.util.Random;
 
 /**
+ * From MultiBit-hd: https://github.com/bitcoin-solutions/multibit-hd/blob/develop/mbhd-brit/src/main/java/org/multibit/hd/brit/utils/FileUtils.java
+ * 
  * <p>Utility to provide the following to file system:</p>
  * <ul>
  * <li>Handling temporary files</li>
@@ -73,41 +75,5 @@ public class FileUtils {
 
     in.close();
     out.close();
-  }
-
-  public static File makeRandomTemporaryDirectory() throws IOException {
-    File temporaryFile = File.createTempFile("nothing", "nothing");
-    temporaryFile.deleteOnExit();
-
-    File parentDirectory = temporaryFile.getParentFile();
-
-    File temporaryDirectory = new File(parentDirectory.getAbsolutePath() + File.separator + ("" + (new Random()).nextInt(1000000)));
-    temporaryDirectory.mkdir();
-    temporaryDirectory.deleteOnExit();
-
-    return temporaryDirectory;
-  }
-
-  /**
-   * Work out the file part of a filename
-   *
-   * @param name of file
-   *
-   * @return file part of filename
-   */
-  public static String filePart(String name) {
-    int s = name.lastIndexOf(File.separatorChar);
-    if (s == -1) {
-      return name;
-    } else {
-      return name.substring(s + 1);
-    }
-  }
-
-  public static void createDirectoryIfNecessary(File directoryToCreate) {
-    if (!directoryToCreate.exists()) {
-      Preconditions.checkState(directoryToCreate.mkdir(), "Could not create the directory of '" + directoryToCreate + "'");
-    }
-    Preconditions.checkState(directoryToCreate.isDirectory(), "Incorrectly identified the directory of '" + directoryToCreate + " as a file");
   }
 }
