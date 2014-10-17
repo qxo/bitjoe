@@ -12,8 +12,8 @@ import org.bitcoinj.core.WalletExtension;
 
 public class FileKeysExtension implements WalletExtension {
 
-    static final String EXTENSION_ID = FileKeysExtension.class.getName();
-    static final SecureRandom random = new SecureRandom();
+    public static final String EXTENSION_ID = FileKeysExtension.class.getName();
+    private static final SecureRandom random = new SecureRandom();
     
     private SecretKey key;
 

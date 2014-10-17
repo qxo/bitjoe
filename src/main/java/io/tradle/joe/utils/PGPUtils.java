@@ -1,4 +1,4 @@
-package io.tradle.joe;
+package io.tradle.joe.utils;
 
 import org.bouncycastle.bcpg.ArmoredOutputStream;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
@@ -11,6 +11,7 @@ import java.security.Security;
 import java.util.Iterator;
 
 /**
+ * From MultiBit-hd: https://github.com/bitcoin-solutions/multibit-hd/blob/develop/mbhd-brit/src/main/java/org/multibit/hd/brit/crypto/PGPUtils.java
  * <p>Utility to provide the following to BRIT API:</p>
  * <ul>
  * <li>Access to PGP crypto functions in Bouncy Castle</li>
