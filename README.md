@@ -12,4 +12,4 @@ Installation
 
 1. Clone this repo from github
 2. run: java io.tradle.joe.Joe 
-3. default port is 80, you can adjust it in conf/config.json
+3. default port is 8080, you can adjust it in conf/config.json
