@@ -8,27 +8,49 @@ import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.codec.http.HttpRequestDecoder;
 import io.netty.handler.codec.http.HttpResponseEncoder;
 import io.netty.handler.ssl.SslContext;
-import io.tradle.joe.handlers.JoeHandler;
+import io.tradle.joe.handlers.DefaultExceptionHandler;
+import io.tradle.joe.handlers.FundsCheck;
+import io.tradle.joe.handlers.TransactionFeeHandler;
+import io.tradle.joe.handlers.RemoteIPFilter;
+import io.tradle.joe.handlers.SendToStorage;
+import io.tradle.joe.handlers.TransactionEncrypter;
+import io.tradle.joe.handlers.TransactionRequestDecoder;
 
 public class JoeInitializer extends ChannelInitializer<SocketChannel> {
+	
+	private final RemoteIPFilter ipFilter;
+	private final FundsCheck fundsCheck;
+	private final TransactionRequestDecoder transactionReqDecoder;
+	private final TransactionEncrypter transactionEncrypter;
+	private final SendToStorage sendToStorage;
+	private final TransactionFeeHandler feeHandler;
+	private final DefaultExceptionHandler exceptionHandler;
 
-    private final SslContext sslCtx;
-
-    public JoeInitializer(SslContext sslCtx) {
-        this.sslCtx = sslCtx;
-    }
-
+	public JoeInitializer() {
+		super();
+		ipFilter = new RemoteIPFilter();
+		fundsCheck = new FundsCheck();
+		transactionReqDecoder = new TransactionRequestDecoder();
+		transactionEncrypter = new TransactionEncrypter();
+		sendToStorage = new SendToStorage();
+		feeHandler = new TransactionFeeHandler();
+		exceptionHandler = new DefaultExceptionHandler();
+	}
+	
     @Override
     public void initChannel(SocketChannel ch) {
-        ChannelPipeline p = ch.pipeline();
-        if (sslCtx != null) {
-            p.addLast(sslCtx.newHandler(ch.alloc()));
-        }
-        
-        p.addLast(new HttpRequestDecoder());
-        p.addLast(new HttpObjectAggregator(1048576));
-        p.addLast(new HttpResponseEncoder());
-        p.addLast(new HttpContentCompressor());
-        p.addLast(new JoeHandler());
+       final ChannelPipeline p = ch.pipeline()
+		 .addLast(new HttpRequestDecoder())
+		 .addLast(new HttpObjectAggregator(1048576))
+		 .addLast(new HttpResponseEncoder())
+		 .addLast(new HttpContentCompressor())
+		 .addLast(ipFilter) 					// filter out remote ips
+//		 .addLast(new RemoteIPFilter())
+		 .addLast(fundsCheck)					// check if we have the funds to pay for the transaction
+		 .addLast(transactionReqDecoder)		// parse
+		 .addLast(transactionEncrypter)			// encrypt
+		 .addLast(sendToStorage)				// send to keeper network
+		 .addLast(feeHandler)					// create bitcoin transaction
+		 .addLast(exceptionHandler);
     }
 }

@@ -16,25 +16,11 @@ import org.bitcoinj.utils.BriefLogFormatter;
 
 public final class JoeServer {
 
-    static final boolean SSL = System.getProperty("ssl") != null;
-    static final int PORT = Integer.parseInt(System.getProperty("port", SSL? "8443" : "8080"));
-
     public static void main(String[] args) throws Exception {
         // This line makes the log output more compact and easily read, especially when using the JDK log adapter.
         BriefLogFormatter.init();
+        System.out.println("Wallet balance: " + Joe.JOE.wallet().getBalance().toFriendlyString());
         
-        Joe joe = Joe.TestNet;
-        WalletAppKit kit = joe.kit();
-    	
-        // Configure SSL.
-        final SslContext sslCtx;
-        if (SSL) {
-            SelfSignedCertificate ssc = new SelfSignedCertificate();
-            sslCtx = SslContext.newServerContext(ssc.certificate(), ssc.privateKey());
-        } else {
-            sslCtx = null;
-        }
-
         EventLoopGroup bossGroup = new NioEventLoopGroup(1);
         EventLoopGroup workerGroup = new NioEventLoopGroup();
         try {
@@ -42,12 +28,11 @@ public final class JoeServer {
             b.group(bossGroup, workerGroup)
              .channel(NioServerSocketChannel.class)
              .handler(new LoggingHandler(LogLevel.INFO))
-             .childHandler(new JoeInitializer(sslCtx));
+             .childHandler(new JoeInitializer());
 
-            Channel ch = b.bind(PORT).sync().channel();
+            Channel ch = b.bind(Joe.JOE.config().address().port()).sync().channel();
 
-            System.err.println("Open your web browser and navigate to " +
-                    (SSL? "https" : "http") + "://127.0.0.1:" + PORT + '/');
+            System.err.println("Open your web browser and navigate to " + Joe.JOE.config().address());
 
             ch.closeFuture().sync();
         } finally {

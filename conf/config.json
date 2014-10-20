@@ -1,0 +1,26 @@
+{
+	"wallet": {
+		"folder": "wallet",
+		"name": "joeWallet"
+	},
+	"prefix": "tradle ",
+	"maxDataBytes": 40,
+	"net": "testnet",
+	"allowSpendUnconfirmed": true,
+	
+	"joeAddress" : {
+		"host": "http://127.0.0.1",
+		"port": 8080
+	},
+
+	"keeperAddresses" : [
+		{
+			"host": "http://127.0.0.1",
+			"port": 8008
+		},
+		{
+			"host": "http://127.0.0.1",
+			"port": 8009
+		}
+	]
+}
