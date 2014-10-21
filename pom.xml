@@ -5,16 +5,56 @@
   <version>0.0.1-SNAPSHOT</version>
   <name>BitJoe</name>
   <description>Bare bones implementation of Tradle crypto journal node</description>
+  <packaging>jar</packaging>
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-shade-plugin</artifactId>
+        <version>2.2</version>
+        <executions>
+          <execution>
+            <phase>package</phase>
+            <goals>
+              <goal>shade</goal>
+            </goals>
+            <configuration>
+              <transformers>
+                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+	              <mainClass>io.tradle.joe.server.JoeServer</mainClass>
+                </transformer>
+              </transformers>
+              <!--artifactSet>
+                <excludes>
+                  <exclude>org.bitcoinj:*</exclude>
+                </excludes>
+              </artifactSet-->
+	         <filters>
+		        <filter>
+		            <artifact>*:*</artifact>
+                    <!-- exclude signatures, the bundling process breaks them for some reason -->
+		            <excludes>
+		                <exclude>META-INF/*.SF</exclude>
+		                <exclude>META-INF/*.DSA</exclude>
+		                <exclude>META-INF/*.RSA</exclude>
+		            </excludes>
+		        </filter>
+		    </filters>     
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
   <dependencies>
   	<dependency>
 	    <groupId>io.netty</groupId>
 	    <artifactId>netty-all</artifactId> <!-- Use 'netty-all' for 4.0 or above -->
 	    <version>4.0.23.Final</version>
-	    <scope>compile</scope>
 	</dependency>
 	<dependency>
         <groupId>org.bitcoinj</groupId>
-        <artifactId>bitcoinj-core</artifactId>
+        <artifactId>bitcoinj-core-bundled</artifactId>
         <version>0.13-SNAPSHOT</version>
     </dependency>
     <dependency>
