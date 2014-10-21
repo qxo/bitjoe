@@ -7,18 +7,19 @@ import io.netty.handler.codec.http.HttpContentCompressor;
 import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.codec.http.HttpRequestDecoder;
 import io.netty.handler.codec.http.HttpResponseEncoder;
-import io.netty.handler.ssl.SslContext;
 import io.tradle.joe.handlers.DefaultExceptionHandler;
 import io.tradle.joe.handlers.FundsCheck;
-import io.tradle.joe.handlers.TransactionFeeHandler;
+import io.tradle.joe.handlers.QueryFilter;
 import io.tradle.joe.handlers.RemoteIPFilter;
 import io.tradle.joe.handlers.SendToStorage;
 import io.tradle.joe.handlers.TransactionEncrypter;
+import io.tradle.joe.handlers.TransactionFeeHandler;
 import io.tradle.joe.handlers.TransactionRequestDecoder;
 
 public class JoeInitializer extends ChannelInitializer<SocketChannel> {
 	
 	private final RemoteIPFilter ipFilter;
+	private final QueryFilter queryFilter;
 	private final FundsCheck fundsCheck;
 	private final TransactionRequestDecoder transactionReqDecoder;
 	private final TransactionEncrypter transactionEncrypter;
@@ -29,6 +30,7 @@ public class JoeInitializer extends ChannelInitializer<SocketChannel> {
 	public JoeInitializer() {
 		super();
 		ipFilter = new RemoteIPFilter();
+		queryFilter = new QueryFilter();
 		fundsCheck = new FundsCheck();
 		transactionReqDecoder = new TransactionRequestDecoder();
 		transactionEncrypter = new TransactionEncrypter();
@@ -45,6 +47,7 @@ public class JoeInitializer extends ChannelInitializer<SocketChannel> {
 		 .addLast(new HttpResponseEncoder())
 		 .addLast(new HttpContentCompressor())
 		 .addLast(ipFilter) 					// filter out remote ips
+		 .addLast(queryFilter) 					// filter out reqs for favicon, etc.
 //		 .addLast(new RemoteIPFilter())
 		 .addLast(fundsCheck)					// check if we have the funds to pay for the transaction
 		 .addLast(transactionReqDecoder)		// parse
