@@ -19,13 +19,13 @@ public class FundsCheck extends SimpleChannelInboundHandler<HttpRequest> {
 	private final Logger logger = LoggerFactory.getLogger(FundsCheck.class);
 
 	public FundsCheck() {
-		super(false);
+		super(false); // do not release msg object since it's passed through
 	}
-	
+
 	@Override
 	protected void channelRead0(ChannelHandlerContext ctx, HttpRequest req) throws Exception {
 		Wallet w = Joe.JOE.wallet();
-    	Coin fees = Transaction.REFERENCE_DEFAULT_MIN_TX_FEE.add(Joe.JOE.appFee());
+    	Coin fees = Transaction.REFERENCE_DEFAULT_MIN_TX_FEE.add(Joe.JOE.txCost());
         Coin balance = w.getBalance();	
         
         System.out.println("Wallet has " + balance.toFriendlyString());

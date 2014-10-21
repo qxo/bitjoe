@@ -1,17 +1,18 @@
 package io.tradle.joe.handlers;
 
 import static com.google.common.base.Preconditions.checkArgument;
-import io.netty.handler.codec.http.HttpRequest;
 import io.netty.util.CharsetUtil;
-import io.tradle.joe.FileKeysExtension;
 import io.tradle.joe.Joe;
 import io.tradle.joe.TransactionRequest;
 import io.tradle.joe.utils.AESUtils;
+import io.tradle.joe.utils.ECUtils;
 
 import java.util.Arrays;
 
 import org.apache.commons.codec.binary.Base64;
 import org.bitcoinj.core.Base58;
+import org.bitcoinj.crypto.DeterministicKey;
+import org.bitcoinj.wallet.KeyChain.KeyPurpose;
 import org.h2.security.SHA256;
 import org.spongycastle.crypto.params.KeyParameter;
 
@@ -31,14 +32,13 @@ public class StorageTransaction {
 		this.unencryptedBytes = unencryptedBytes;
 		
 	   	// encrypt & store tx
-        // Create an AES encoded version of the unencryptedBytes, using the credentials
-    	FileKeysExtension fileKeys = (FileKeysExtension) Joe.JOE.wallet().getExtensions().get(FileKeysExtension.EXTENSION_ID);
-    	KeyParameter keyParameter = new KeyParameter(fileKeys.key().getEncoded());
-    	
-        encryptedBytes = AESUtils.encrypt(unencryptedBytes, keyParameter, AESUtils.AES_INITIALISATION_VECTOR);
+		// HACK:
+		KeyParameter sharedSecret = Joe.JOE.getSharedSecretKeyParameter(req.getDestinationKey(), Joe.JOE.wallet().currentKey(KeyPurpose.CHANGE));
+		
+        encryptedBytes = AESUtils.encrypt(unencryptedBytes, sharedSecret, AESUtils.AES_INITIALISATION_VECTOR);
         
         // Check that the encryption is reversible
-        byte[] rebornBytes = AESUtils.decrypt(encryptedBytes, keyParameter, AESUtils.AES_INITIALISATION_VECTOR);
+        byte[] rebornBytes = AESUtils.decrypt(encryptedBytes, sharedSecret, AESUtils.AES_INITIALISATION_VECTOR);
          
         checkArgument(Arrays.equals(unencryptedBytes, rebornBytes), "The encryption was not reversible so aborting.");
     	
@@ -91,7 +91,7 @@ public class StorageTransaction {
 		return hashString;
 	}
 
-	public TransactionRequest httpRequest() {
+	public TransactionRequest transactionRequest() {
 		return req;
 	}
 	

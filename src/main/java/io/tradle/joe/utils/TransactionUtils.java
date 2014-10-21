@@ -14,12 +14,17 @@ public class TransactionUtils {
 	}
 
 	public static byte[] getDataFromTransaction(Transaction tx) {
+		TransactionOutput opReturnOutput = getOpReturnOutput(tx);
+		return opReturnOutput == null ? null : scriptToMetadata(opReturnOutput.getScriptBytes());
+	}
+
+	public static TransactionOutput getOpReturnOutput(Transaction tx) {
 		List<TransactionOutput> txOuts = tx.getOutputs();
 		for (TransactionOutput t: txOuts) {
 			if (t.getValue().isZero()) {
 				byte[] scriptBytes = t.getScriptBytes();
 				if (scriptBytes != null)
-					return scriptToMetadata(scriptBytes);
+					return t;
 			}
 		}
 		

@@ -15,6 +15,10 @@ public class TransactionEncrypter extends SimpleChannelInboundHandler<Transactio
 	
 	private final Logger logger = LoggerFactory.getLogger(TransactionEncrypter.class);
 	
+	public TransactionEncrypter() {
+		super(false); // do not release msg object since it's passed through
+	}
+	
 	@Override
 	protected void channelRead0(ChannelHandlerContext ctx, TransactionRequest req) throws Exception {
     	String data = req.data().toString();

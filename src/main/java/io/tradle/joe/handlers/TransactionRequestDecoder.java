@@ -13,9 +13,9 @@ import io.tradle.joe.TransactionRequest;
 
 @Sharable
 public class TransactionRequestDecoder extends SimpleChannelInboundHandler<HttpRequest> {
-
+	
 	public TransactionRequestDecoder() {
-		super(false);
+		super(false); // do not release msg object since it's passed through
 	}
 	
 	@Override

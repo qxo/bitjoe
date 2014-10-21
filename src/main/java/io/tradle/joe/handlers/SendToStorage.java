@@ -18,6 +18,10 @@ public class SendToStorage extends SimpleChannelInboundHandler<StorageTransactio
 
 	private final Logger logger = LoggerFactory.getLogger(SendToStorage.class);
 
+	public SendToStorage() {
+		super(false); // do not release msg object since it's passed through
+	}
+
 	@Override
 	protected void channelRead0(ChannelHandlerContext ctx, StorageTransaction t) throws Exception {
 		Config.AddressConfig keeper = Joe.JOE.config().keepers().get(0);

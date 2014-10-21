@@ -1,5 +1,15 @@
 package io.tradle.joe.utils;
 
+import static com.google.common.base.Preconditions.checkNotNull;
+import static com.google.common.base.Preconditions.checkState;
+
+import java.util.Arrays;
+
+import javax.crypto.SecretKey;
+import javax.crypto.SecretKeyFactory;
+import javax.crypto.spec.PBEKeySpec;
+import javax.crypto.spec.SecretKeySpec;
+
 import org.bitcoinj.crypto.KeyCrypterException;
 import org.spongycastle.crypto.BufferedBlockCipher;
 import org.spongycastle.crypto.engines.AESFastEngine;
@@ -7,11 +17,6 @@ import org.spongycastle.crypto.modes.CBCBlockCipher;
 import org.spongycastle.crypto.paddings.PaddedBufferedBlockCipher;
 import org.spongycastle.crypto.params.KeyParameter;
 import org.spongycastle.crypto.params.ParametersWithIV;
-
-import java.util.Arrays;
-
-import static com.google.common.base.Preconditions.checkNotNull;
-import static com.google.common.base.Preconditions.checkState;
 
 /**
  * From MultiBit-hd: https://github.com/bitcoin-solutions/multibit-hd/blob/develop/mbhd-brit/src/main/java/org/multibit/hd/brit/crypto/AESUtils.java
@@ -124,6 +129,18 @@ public class AESUtils {
     } catch (Exception e) {
       throw new KeyCrypterException("Could not decrypt bytes", e);
     }
+  }
+  
+  public static SecretKey generateKey(char[] password) {
+	  try {
+		  SecretKeyFactory kf = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA1");
+		  PBEKeySpec spec = new PBEKeySpec(password, SCRYPT_SALT, 8192, 256);
+		  SecretKey tmp = kf.generateSecret(spec);
+		  return new SecretKeySpec(tmp.getEncoded(), "AES");
+	  } catch (Exception e) {
+		  // should never happen but...
+		  throw new IllegalArgumentException("failed to generate AES key from password", e);
+	  }
   }
 
 }

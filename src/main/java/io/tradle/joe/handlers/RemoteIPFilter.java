@@ -13,11 +13,11 @@ import org.slf4j.LoggerFactory;
 public class RemoteIPFilter extends SimpleChannelInboundHandler<HttpRequest> {
 
 	private final Logger logger = LoggerFactory.getLogger(RemoteIPFilter.class);
-	
-	public RemoteIPFilter() {
-		super(false);
-	}
 
+	public RemoteIPFilter() {
+		super(false); // do not release msg object since it's passed through
+	}
+	
 	@Override
 	protected void channelRead0(ChannelHandlerContext ctx, HttpRequest req) throws Exception {
 		if (!"127.0.0.1".equals(Utils.getRemoteIPAddress(ctx)))
@@ -25,16 +25,4 @@ public class RemoteIPFilter extends SimpleChannelInboundHandler<HttpRequest> {
 		else
 			ctx.fireChannelRead(req);
 	}
-	
-	@Override
-	public void channelReadComplete(ChannelHandlerContext ctx) {
-		ctx.flush();
-	}
-	
-	@Override
-    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
-		logger.error("exception in IP Filter", cause);
-		ctx.close();
-	}
-
 }
