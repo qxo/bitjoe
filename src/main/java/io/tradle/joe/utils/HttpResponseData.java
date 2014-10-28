@@ -26,9 +26,14 @@ public class HttpResponseData {
 		return response;
 	}
 
-	public String toJsonString() {
-		if (json == null)
-			json = new GsonBuilder().create().toJson(this);
+	public String toJsonString(boolean prettyPrint) {
+		if (json == null) {
+			GsonBuilder builder = new GsonBuilder();
+			if (prettyPrint)
+				builder.setPrettyPrinting();
+			
+			json = builder.create().toJson(this);
+		}
 		
 		return json;
 	}

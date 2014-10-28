@@ -27,17 +27,25 @@ public class SendToStorage extends SimpleChannelInboundHandler<StorageTransactio
 		Config.AddressConfig keeper = Joe.JOE.config().keepers().get(0);
 		String key = t.getHashString();
 		String value = t.getEncryptedString();
-		
+
 		QueryStringEncoder url = new QueryStringEncoder(keeper.toString());
 		url.addParam("key", key);
-		url.addParam("value", value);
+		url.addParam("val", value);
 		
 		System.out.println("Sending to storage");
 		System.out.println("Key: " + key);
 		System.out.println("Value: " + value);
 		HttpResponseData response = Utils.get(url.toUri());
-		if (response.code() > 399)
-			throw new StorageException("transaction refused by keeper network: " + response.code() + " " + response.response());
+		int code = response.code();
+		if (code < 0)
+			throw new StorageException("failed to reach keeper, transaction aborted");
+		else if (code > 399) {
+			if (code == 409) {
+				// TODO: find transaction in block chain with this OP_RETURN, return associated data
+			}
+
+			throw new StorageException("transaction refused by keeper network: " + code + " " + response.response());
+		}
 		else
 			ctx.fireChannelRead(t);
 	}

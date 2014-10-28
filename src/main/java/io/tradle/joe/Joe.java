@@ -3,7 +3,6 @@ package io.tradle.joe;
 import io.netty.handler.codec.http.QueryStringEncoder;
 import io.netty.util.CharsetUtil;
 import io.tradle.joe.utils.AESUtils;
-import io.tradle.joe.utils.ECUtils;
 import io.tradle.joe.utils.HttpResponseData;
 import io.tradle.joe.utils.TransactionUtils;
 import io.tradle.joe.utils.Utils;
@@ -16,22 +15,17 @@ import java.net.URISyntaxException;
 import java.util.List;
 
 import org.bitcoinj.core.AbstractWalletEventListener;
-import org.bitcoinj.core.Address;
-import org.bitcoinj.core.AddressFormatException;
-import org.bitcoinj.core.Base58;
 import org.bitcoinj.core.Coin;
 import org.bitcoinj.core.ECKey;
 import org.bitcoinj.core.NetworkParameters;
 import org.bitcoinj.core.Transaction;
-import org.bitcoinj.core.TransactionOutput;
 import org.bitcoinj.core.Wallet;
 import org.bitcoinj.core.WalletExtension;
 import org.bitcoinj.kits.WalletAppKit;
-import org.bitcoinj.wallet.KeyChain.KeyPurpose;
+import org.bitcoinj.params.TestNet3Params;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.spongycastle.crypto.params.KeyParameter;
-import org.spongycastle.util.Arrays;
 
 import com.google.common.collect.ImmutableList;
 import com.google.gson.Gson;
@@ -70,112 +64,32 @@ public enum Joe {
 								config.wallet().name()) {
 			@Override
 	        protected List<WalletExtension> provideWalletExtensions() {
-	            return ImmutableList.<WalletExtension>of(new FileKeysExtension());
+	            return ImmutableList.<WalletExtension>of(
+            		new FileKeysExtension()
+        		);
 	        }
 		};
 		
 		kit.startAsync();
 		kit.awaitRunning();
 		
+//		kit.chain().addListener(new BlockMonitor());
 		kit.wallet().addEventListener(new AbstractWalletEventListener() {
             @Override
             public void onCoinsReceived(Wallet wallet, Transaction tx, Coin prevBalance, Coin newBalance) {
-            	List<TransactionOutput> txOuts = tx.getOutputs();
-            	NetworkParameters params = config.networkParams();
-            	Address receivedAt = null;
-            	Address from = null;
-            	byte[] dataBytes = null;
-            	for (TransactionOutput o: txOuts) {
-            		if (o.getValue().isZero()) {
-            			dataBytes = TransactionUtils.scriptToMetadata(o.getScriptBytes());
-            		}
-            		else if (o.isMine(wallet)) {
-            			receivedAt = o.getAddressFromP2PKHScript(params);
-//            			from = o.getSpentBy().getFromAddress();
-            			from = tx.getInputs().get(0).getFromAddress();
-            		}
-            	}
-            	
-            	
-            	
-            	if (dataBytes == null)
-            		return;
-            	
-                String data = Base58.encode(Arrays.copyOfRange(dataBytes, getDataPrefix().length, dataBytes.length));
-                
-                QueryStringEncoder qs = new QueryStringEncoder(config.keepers().get(0).toString() + "keeper");
-                qs.addParam("key", data);
-                
-                HttpResponseData response = null;
-                try {
-					response = Utils.get(qs.toUri());
-                } catch (URISyntaxException e) {
-					logger.error("Constructed bad URI: " + qs, e);
-					return;
-				} 
-                
-				if (response.code() > 399) {
-					System.err.println("Hash not found in storage: " + data);
-					return;
-				}
-					
-				System.out.println("Hash found in storage!");
-				System.out.println("Key: " + data);
-				System.out.println("Value: " + response.response());
-		
-				KeyParameter keyParameter = JOE.getSharedSecretKeyParameter(null, null);
-		    	byte[] decrypted = null;
-				try {
-					decrypted = AESUtils.decrypt(Base58.decode(response.response()), keyParameter, AESUtils.AES_INITIALISATION_VECTOR);
-				} catch (AddressFormatException e) {
-					logger.error("Failed to decrypt data, wasn't in expected base58 format: " + response.response(), e);
-					return;
-				}
-				
-				String originalData = new String(decrypted, CharsetUtil.UTF_8);
-				System.out.println("Decrypted data from storage: " + originalData);
-				
-//				JsonParser parser = new JsonParser();
-//		    	JsonElement json = parser.parse(originalData);
+            	JOE.extractDataFromTransaction(tx);
             }
         });
 		
 		if (config.allowSpendUnconfirmed())
 			kit.wallet().allowSpendingUnconfirmedTransactions();
 		
-//		if (password != null) {
-//			KeyCrypter keyCrypter = kit.wallet().getKeyCrypter();
-//			if (keyCrypter == null) {	
-//	            final KeyCrypterScrypt scrypt = new KeyCrypterScrypt();
-//	            keyParameter = scrypt.deriveKey(password);
-//				kit.wallet().encrypt(scrypt, keyParameter);
-//				keyCrypter = kit.wallet().getKeyCrypter();
-//			}
-//			
-//			keyParameter = keyCrypter.deriveKey(password);
-//			if (!kit.wallet().isEncrypted())
-//				kit.wallet().encrypt(password);
-//		}
-			
 		APP_FEE = Transaction.REFERENCE_DEFAULT_MIN_TX_FEE.multiply(3);
-//		APP_ADDRESS = kit.wallet().currentReceiveAddress(); // while testing, just send back to self (for all apps) 
 	}
 
 	public Config config() {
 		return config;
 	}
-	
-//	public Coin appFee() {
-//		return APP_FEE;
-//	}
-//
-//	public Address appAddress() {
-//		return APP_ADDRESS;
-//	}
-//	
-//	public Address appAddress(String appName) {
-//		return APP_ADDRESS;
-//	}
 	
 	public Coin txCost() {
 		return APP_FEE;
@@ -193,26 +107,66 @@ public enum Joe {
 		return kit.wallet();
 	}
 	
-//	public String walletName() {
-//		return walletName;
-//	}
-//	
-//	public String password() {
-//		return password;
-//	}
-//
-//	public KeyParameter keyParameter() {
-//		return keyParameter;
-//	}
-
+	/**
+	 * @param from
+	 * @param to
+	 * @return
+	 */
 	public KeyParameter getSharedSecretKeyParameter(ECKey from, ECKey to) {
-		// HACK:
-		if (sharedSecret == null) {
-			ECKey change = JOE.wallet().currentKey(KeyPurpose.CHANGE);
-			ECKey receive = JOE.wallet().currentKey(KeyPurpose.RECEIVE_FUNDS);
-			sharedSecret = ECUtils.getSharedSecretKeyParameter(change.getPubKeyPoint(), receive.getPrivKey());
+		// TODO: implement separate store of keys used for encryption
+		return null;
+	}
+
+	public static boolean isOnTestnet() {
+		return JOE.params().equals(TestNet3Params.get());
+	}
+
+	public void extractDataFromTransaction(Transaction tx) {
+		Joe joe = Joe.JOE;
+		Config config = joe.config();
+		byte[] dataBytes = TransactionUtils.getDataFromTransaction(tx, true);
+		String data = TransactionUtils.transactionDataToString(dataBytes);
+        
+        QueryStringEncoder qs = new QueryStringEncoder(config.keepers().get(0).toString());
+        qs.addParam("key", data);
+        
+        HttpResponseData response = null;
+        try {
+			response = Utils.get(qs.toUri());
+        } catch (URISyntaxException e) {
+			logger.error("Constructed bad URI: " + qs, e);
+			return;
+		} 
+        
+		if (response.code() > 399) {
+			System.err.println("Hash not found in storage: " + data);
+			return;
 		}
+			
+		System.out.println("Hash found in storage!");
+		System.out.println("Key: " + data);
+		System.out.println("Value: " + response.response());
 		
-		return sharedSecret;
+		KeyParameter keyParameter = joe.getSharedSecretKeyParameter(null, null);
+		boolean isEncrypted = keyParameter != null;
+		byte[] decrypted = null;
+		byte[] encrypted = response.response().getBytes(CharsetUtil.UTF_8);
+		
+		if (isEncrypted) {
+			try {
+				decrypted = AESUtils.decrypt(encrypted, keyParameter, AESUtils.AES_INITIALISATION_VECTOR);
+			} catch (Exception e) {
+				logger.error("Failed to decrypt data: " + response.response(), e);
+				return;
+			}
+		}
+		else
+			decrypted = encrypted;
+		
+		String originalData = new String(decrypted, CharsetUtil.UTF_8);
+		if (isEncrypted)
+			System.out.println("Decrypted data from storage: " + originalData);
+		else
+			System.out.println("Retrieved unencrypted data from storage: " + originalData);				
 	}
 }

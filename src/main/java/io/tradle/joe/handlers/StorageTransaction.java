@@ -5,14 +5,11 @@ import io.netty.util.CharsetUtil;
 import io.tradle.joe.Joe;
 import io.tradle.joe.TransactionRequest;
 import io.tradle.joe.utils.AESUtils;
-import io.tradle.joe.utils.ECUtils;
+import io.tradle.joe.utils.Utils;
 
 import java.util.Arrays;
 
-import org.apache.commons.codec.binary.Base64;
-import org.bitcoinj.core.Base58;
-import org.bitcoinj.crypto.DeterministicKey;
-import org.bitcoinj.wallet.KeyChain.KeyPurpose;
+import org.bitcoinj.core.ECKey;
 import org.h2.security.SHA256;
 import org.spongycastle.crypto.params.KeyParameter;
 
@@ -30,19 +27,29 @@ public class StorageTransaction {
 	public StorageTransaction(TransactionRequest req, byte[] unencryptedBytes) {
 		this.req = req;
 		this.unencryptedBytes = unencryptedBytes;
+
+		KeyParameter sharedSecret = null;
+		if (!Utils.isTruthy(req.param("cleartext"))) {
+			ECKey encryptionKeyBase = new ECKey();
+			Joe.JOE.wallet().importKey(encryptionKeyBase); // TODO: store separately from signing keys
+			
+			// TODO: check if this is complete bullshit:
+			byte[] secret = SHA256.getHash(encryptionKeyBase.getPubKeyHash(), false);
+			sharedSecret = new KeyParameter(secret);
+		}
 		
-	   	// encrypt & store tx
-		// HACK:
-		KeyParameter sharedSecret = Joe.JOE.getSharedSecretKeyParameter(req.getDestinationKey(), Joe.JOE.wallet().currentKey(KeyPurpose.CHANGE));
+		if (sharedSecret == null)
+			encryptedBytes = unencryptedBytes;
+		else {
+			encryptedBytes = AESUtils.encrypt(unencryptedBytes, sharedSecret, AESUtils.AES_INITIALISATION_VECTOR);
+	        
+	        // Check that the encryption is reversible
+	        byte[] rebornBytes = AESUtils.decrypt(encryptedBytes, sharedSecret, AESUtils.AES_INITIALISATION_VECTOR);
+	         
+	        checkArgument(Arrays.equals(unencryptedBytes, rebornBytes), "The encryption was not reversible so aborting.");
+		}
 		
-        encryptedBytes = AESUtils.encrypt(unencryptedBytes, sharedSecret, AESUtils.AES_INITIALISATION_VECTOR);
-        
-        // Check that the encryption is reversible
-        byte[] rebornBytes = AESUtils.decrypt(encryptedBytes, sharedSecret, AESUtils.AES_INITIALISATION_VECTOR);
-         
-        checkArgument(Arrays.equals(unencryptedBytes, rebornBytes), "The encryption was not reversible so aborting.");
-    	
-    	// hash tx
+        // hash tx
     	hash = SHA256.getHash(encryptedBytes, false);
 	}
 
@@ -58,35 +65,26 @@ public class StorageTransaction {
 		return Arrays.copyOf(hash, hash.length);
 	}
 	
-	private String toBase64String(byte[] bytes) {
-		return new String(Base64.encodeBase64(bytes));
-	}
-
-	private String toBase58String(byte[] bytes) {
-		return Base58.encode(bytes);
-	}
-
-	private String toUTF8String(byte[] bytes) {
-		return new String(bytes, CharsetUtil.UTF_8);
-	}
-	
 	public String getEncryptedString() {
 		if (encryptedString == null)
-			encryptedString = toBase58String(getEncrypted());
+			encryptedString = new String(getEncrypted(), CharsetUtil.UTF_8);
 		
 		return encryptedString;
 	}
 	
 	public String getUnencryptedString() {
 		if (unencryptedString == null)
-			unencryptedString = toUTF8String(getUnencrypted());
+			unencryptedString = new String(getUnencrypted(), CharsetUtil.UTF_8);
 		
 		return unencryptedString;
 	}
 
+	/**
+	 * @return SHA256 hash in base58 of the transaction data
+	 */
 	public String getHashString() {
 		if (hashString == null)
-			hashString = toBase58String(getHash());
+			hashString = Utils.toBase58String(getHash());
 		
 		return hashString;
 	}

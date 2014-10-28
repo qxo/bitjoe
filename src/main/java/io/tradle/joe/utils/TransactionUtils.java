@@ -1,11 +1,15 @@
 package io.tradle.joe.utils;
 
+import io.tradle.joe.Joe;
+
 import java.util.Arrays;
 import java.util.List;
 
+import org.bitcoinj.core.Base58;
 import org.bitcoinj.core.Coin;
 import org.bitcoinj.core.Transaction;
 import org.bitcoinj.core.TransactionOutput;
+import org.bitcoinj.core.Wallet;
 
 public class TransactionUtils {
 
@@ -13,17 +17,33 @@ public class TransactionUtils {
 		tx.addOutput(new TransactionOutput(tx.getParams(), tx, Coin.ZERO, metadataToScript(data)));
 	}
 
+	public static String transactionDataToString(byte[] data) {
+		return Base58.encode(data);
+	}
+	
 	public static byte[] getDataFromTransaction(Transaction tx) {
+		return getDataFromTransaction(tx, false);
+	}
+	
+	public static byte[] getDataFromTransaction(Transaction tx, boolean removePrefix) {
 		TransactionOutput opReturnOutput = getOpReturnOutput(tx);
-		return opReturnOutput == null ? null : scriptToMetadata(opReturnOutput.getScriptBytes());
+		byte[] data = opReturnOutput == null ? null : scriptToMetadata(opReturnOutput.getScriptBytes());
+		if (removePrefix) {
+			byte[] prefixBytes = Joe.JOE.getDataPrefix();
+			if (prefixBytes != null)
+				data = Arrays.copyOfRange(data, prefixBytes.length, data.length);
+		}
+		
+		return data;
 	}
 
 	public static TransactionOutput getOpReturnOutput(Transaction tx) {
 		List<TransactionOutput> txOuts = tx.getOutputs();
+		byte[] prefix = Joe.JOE.getDataPrefix();
 		for (TransactionOutput t: txOuts) {
 			if (t.getValue().isZero()) {
 				byte[] scriptBytes = t.getScriptBytes();
-				if (scriptBytes != null)
+				if (scriptBytes != null && Utils.arrayStartsWith(scriptBytes, prefix))
 					return t;
 			}
 		}
@@ -106,4 +126,21 @@ public class TransactionUtils {
         }
         return bytes;
     }
+
+    /**
+     * <p>Returns true if the list of transaction outputs, whether spent or unspent, match a wallet by address or that are
+     * watched by a wallet, i.e., transaction outputs whose script's address is controlled by the wallet and transaction
+     * outputs whose script is watched by the wallet.</p>
+     *
+     * @param transactionBag The wallet that controls addresses and watches scripts.
+     */
+	public static boolean hasWalletOutputs(Transaction tx, Wallet wallet) {
+		List<TransactionOutput> outs = tx.getOutputs();
+		for (TransactionOutput o: outs) {
+			if (o.isMineOrWatched(wallet))
+				return true;
+		}
+		
+		return false;
+	}
 }

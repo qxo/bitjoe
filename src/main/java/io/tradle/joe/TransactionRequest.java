@@ -2,6 +2,8 @@ package io.tradle.joe;
 
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.QueryStringDecoder;
+import io.tradle.joe.exceptions.InvalidTransactionRequestException;
+import io.tradle.joe.utils.Utils;
 
 import java.util.List;
 import java.util.Map;
@@ -11,39 +13,37 @@ import org.bitcoinj.wallet.KeyChain.KeyPurpose;
 
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.google.gson.JsonSyntaxException;
 
+/**
+ * Parses the transaction request
+ */
 public class TransactionRequest {
 
 	private final JsonObject json;
 	private final HttpRequest req;
 //	private List<String> owners;
 	private ECKey toKey;
+	private Map<String, String> parameters;
 
 	public TransactionRequest(HttpRequest req) {
 		this.req = req;
 		
-		QueryStringDecoder qs = new QueryStringDecoder(req.getUri());
-		Map<String, List<String>> parameters = qs.parameters();
-		String jsonString = parameters.get("data").get(0);
+//		QueryStringDecoder qs = new QueryStringDecoder(req.getUri());
+		parameters = Utils.getRequestParameters(req);
+		String jsonString = parameters.get("data");
 //		toAddress = parameters.get("to").get(0);
-		
+
+		// TODO: send to actual recipients instead of self
 		toKey = Joe.JOE.wallet().currentKey(KeyPurpose.RECEIVE_FUNDS);
 		
     	JsonParser parser = new JsonParser();
-    	json = (JsonObject) parser.parse(jsonString);
-    		
-//    	JsonArray jOwners = json.getAsJsonArray("owners");
-//    	List<String> owners = new ArrayList<String>(jOwners.size());
-//    	for (JsonElement j: jOwners) {
-//    		owners.add(j.getAsString());
-//    	}
-//    	
-//    	this.owners = Collections.unmodifiableList(owners); 
+    	try {
+    		json = (JsonObject) parser.parse(jsonString);
+    	} catch (JsonSyntaxException j) {
+    		throw new InvalidTransactionRequestException("request contained malformed json");
+    	}
 	}
-	
-//	public List<String> owners() {
-//		return owners;
-//	}
 	
 	public JsonObject data() {
 		return json;
@@ -55,5 +55,9 @@ public class TransactionRequest {
 	
 	public ECKey getDestinationKey() {
 		return toKey;
+	}
+	
+	public String param(String name) {
+		return parameters.get(name);
 	}
 }
