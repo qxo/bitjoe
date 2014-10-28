@@ -8,17 +8,20 @@ import org.bitcoinj.core.Wallet.SendResult;
 
 public class TransactionResponse {
 
-	private final String transactionUrl;
-	private final String hash;
+	private final String txUrl;
+	private final String txHash;
 	private final String keeperQueryUrl;
-	private final String data;
+	private final String keyInStorage;
 	
-	public TransactionResponse(SendResult result, String data) {
-		hash = result.tx.getHashAsString();
-		this.data = data;
-		transactionUrl = "https://www.biteasy.com/testnet/transactions/" + hash;
+	public TransactionResponse(SendResult result, String keyInStorage) {
+		txHash = result.tx.getHashAsString();
+		this.keyInStorage = keyInStorage;
+		String netInsert = Joe.isOnTestnet() ? "testnet/" : "";
+		
+//		transactionUrl = "https://blockexplorer.com/" + netInsert + "tx/" + hash;
+		txUrl = "https://www.biteasy.com/" + netInsert + "transactions/" + txHash; // faster than blockexplorer.com
 		QueryStringEncoder qse = new QueryStringEncoder(Joe.JOE.config().keepers().get(0).toString());
-		qse.addParam("key", data);
+		qse.addParam("key", keyInStorage);
 		keeperQueryUrl = qse.toString();
 	}
 }

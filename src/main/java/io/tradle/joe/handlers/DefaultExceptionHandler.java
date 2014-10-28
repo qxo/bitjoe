@@ -33,10 +33,10 @@ public class DefaultExceptionHandler extends ChannelInboundHandlerAdapter {
 
 		HttpResponseStatus status = (cause instanceof BadRequestException) ? BAD_REQUEST : INTERNAL_SERVER_ERROR;
 
-		StringWriter stringWriter = new StringWriter();
-		PrintWriter printWriter = new PrintWriter(stringWriter);
-		cause.printStackTrace(printWriter);
-		String content = new HttpResponseData(status.code(), cause.getMessage()).toJsonString();
+//		StringWriter stringWriter = new StringWriter();
+//		PrintWriter printWriter = new PrintWriter(stringWriter);
+//		cause.printStackTrace(printWriter);
+		String content = new HttpResponseData(status.code(), cause.getMessage()).toJsonString(true) + "\n";
 
 		FullHttpResponse response = new DefaultFullHttpResponse(HTTP_1_1, status, Unpooled.copiedBuffer(content, CharsetUtil.UTF_8));
 

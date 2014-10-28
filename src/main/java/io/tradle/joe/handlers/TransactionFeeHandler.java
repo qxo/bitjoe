@@ -97,7 +97,7 @@ public class TransactionFeeHandler extends SimpleChannelInboundHandler<StorageTr
     	
         FullHttpResponse response = new DefaultFullHttpResponse(
                 HTTP_1_1, req.getDecoderResult().isSuccess()? OK : BAD_REQUEST,
-                Unpooled.copiedBuffer(json, CharsetUtil.UTF_8));
+                Unpooled.copiedBuffer(json + "\n", CharsetUtil.UTF_8));
 
         response.headers().set(CONTENT_TYPE, "application/json; charset=UTF-8");
         ctx.writeAndFlush(response).addListener(ChannelFutureListener.CLOSE);
