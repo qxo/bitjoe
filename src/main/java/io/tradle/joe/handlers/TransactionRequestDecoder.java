@@ -9,7 +9,7 @@ import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.channel.ChannelHandler.Sharable;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.QueryStringDecoder;
-import io.tradle.joe.TransactionRequest;
+import io.tradle.joe.requests.TransactionRequest;
 
 @Sharable
 public class TransactionRequestDecoder extends SimpleChannelInboundHandler<HttpRequest> {

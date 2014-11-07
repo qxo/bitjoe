@@ -1,6 +1,9 @@
 package io.tradle.joe;
 
+import io.tradle.joe.protocols.WebHookProtos.Event;
+
 import java.util.List;
+import java.util.Map;
 
 import org.bitcoinj.core.NetworkParameters;
 import org.bitcoinj.params.MainNetParams;
@@ -16,12 +19,15 @@ public class Config {
 	}
 	
 	private int maxDataBytes;
+	private int webHookMaxTimeouts;
 	private boolean allowSpendUnconfirmed;
 	private Net net;
 	private WalletConfig wallet;
 	private String prefix;
 	private AddressConfig joeAddress;
 	private List<AddressConfig> keeperAddresses;
+	private List<WebHooksConfig> webHooks;
+	private List<String> testIdentities;
 	
 	public String prefix() {
 		return prefix;
@@ -55,6 +61,9 @@ public class Config {
 		return joeAddress;
 	}
 	
+	public List<WebHooksConfig> webHooks() {
+		return webHooks;
+	}
 
 	public WalletConfig wallet() {
 		return wallet;
@@ -94,5 +103,26 @@ public class Config {
 		public String name() {
 			return name;
 		}
+	}
+
+	public static class WebHooksConfig {
+		String url;
+		Event[] events;
+
+		public String url() {
+			return url;
+		}
+		
+		public Event[] events() {
+			return events;
+		}
+	}
+	
+	public List<String> testIdentities() {
+		return testIdentities;
+	}
+
+	public int webHookMaxTimeouts() {
+		return webHookMaxTimeouts;
 	}
 }

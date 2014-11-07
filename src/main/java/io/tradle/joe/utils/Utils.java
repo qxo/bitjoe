@@ -8,27 +8,33 @@ import io.netty.handler.codec.http.multipart.Attribute;
 import io.netty.handler.codec.http.multipart.HttpPostRequestDecoder;
 import io.netty.handler.codec.http.multipart.InterfaceHttpData;
 import io.netty.handler.codec.http.multipart.InterfaceHttpData.HttpDataType;
-import io.netty.util.CharsetUtil;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.UnsupportedEncodingException;
 import java.net.InetSocketAddress;
 import java.net.URI;
+import java.net.URISyntaxException;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Set;
 
 import org.apache.commons.codec.binary.Base64;
 import org.apache.http.HttpResponse;
+import org.apache.http.NameValuePair;
 import org.apache.http.client.HttpClient;
+import org.apache.http.client.entity.UrlEncodedFormEntity;
 import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.client.methods.HttpUriRequest;
 import org.apache.http.impl.client.HttpClientBuilder;
+import org.apache.http.message.BasicNameValuePair;
 import org.bitcoinj.core.Base58;
-import org.h2.security.SHA256;
-import org.spongycastle.util.encoders.Hex;
+import org.bitcoinj.core.NetworkParameters;
 
 //import io.netty.handler.codec.http.HttpHeaderUtil;
 
@@ -57,8 +63,47 @@ public class Utils {
 	 * @return response data in the form of an integer code and string response
 	 */
 	public static HttpResponseData get(URI uri) {
+		return executeHttpRequest(new HttpGet(uri));
+	}
+
+	/**
+	 * sends POST request to specified uri
+	 * @param uri - uri to send GET request to
+	 * @return response data in the form of an integer code and string response
+	 */
+	public static HttpResponseData post(String uri, Map<String, String> params) {
+		try {
+			return post(new URI(uri), params);
+		} catch (URISyntaxException e) {
+			throw new IllegalArgumentException("malformed uri: " + uri, e);
+		}
+	}
+
+	/**
+	 * sends POST request to specified uri
+	 * @param uri - uri to send GET request to
+	 * @return response data in the form of an integer code and string response
+	 */
+	public static HttpResponseData post(URI uri, Map<String, String> params) {
+		HttpPost request = new HttpPost(uri);
+		List<NameValuePair> urlParameters = new ArrayList<NameValuePair>();
+		Set<String> paramNames = params.keySet();
+		for (String paramName: paramNames) {
+			urlParameters.add(new BasicNameValuePair(paramName, params.get(paramName)));
+		}
+		
+		try {
+			request.setEntity(new UrlEncodedFormEntity(urlParameters));
+		} catch (UnsupportedEncodingException e) {
+			// should never happen, but...
+			throw new IllegalArgumentException("Failed to build POST request", e);
+		}
+	
+		return executeHttpRequest(request);
+	}
+	
+	public static HttpResponseData executeHttpRequest(HttpUriRequest request) {
 		HttpClient client = HttpClientBuilder.create().build();
-		HttpGet request = new HttpGet(uri);
 		HttpResponse response = null;
 		String respStr = null;
 		int code = -1;
@@ -69,8 +114,7 @@ public class Utils {
 			// Get the response
 			StringBuilder respSB = new StringBuilder();
 			String line;
-			BufferedReader rd = new BufferedReader(new InputStreamReader(
-					response.getEntity().getContent()));
+			BufferedReader rd = new BufferedReader(new InputStreamReader(response.getEntity().getContent()));
 			while ((line = rd.readLine()) != null) {
 				respSB.append(line);
 			}
@@ -170,5 +214,42 @@ public class Utils {
 			   s.equals("false") ||
 			   s.equals("n") ||
 			   s.equals("no");
+	}
+	
+	/**
+	 * @param items
+	 * @param delimiter
+	 * @return delimiter separated string of items
+	 */
+	public static <T> String join(Iterable<T> items, String delimiter) {
+		Iterator<T> i = items.iterator();
+		if (!i.hasNext())
+			return "";
+		
+		StringBuilder sb = new StringBuilder();
+		sb.append(i.next());
+		while (i.hasNext()) {
+			sb.append(delimiter);
+			sb.append(i.next());
+		}
+		
+		return sb.toString();
+	}
+
+	@SafeVarargs
+	public static <T> boolean isOneOf(T t, T... choices) {		
+		for (T choice: choices) {
+			if (isEqual(t, choice))
+				return true;
+		}
+		
+		return false;
+	}
+	
+	public static <T> boolean isEqual(T a, T b) {
+		if (a == null)
+			return b == null;
+		
+		return a.equals(b);
 	}
 }

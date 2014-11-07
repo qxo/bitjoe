@@ -26,6 +26,10 @@ public class HttpResponseData {
 		return response;
 	}
 
+	public String toJsonString() {
+		return toJsonString(false);
+	}
+
 	public String toJsonString(boolean prettyPrint) {
 		if (json == null) {
 			GsonBuilder builder = new GsonBuilder();

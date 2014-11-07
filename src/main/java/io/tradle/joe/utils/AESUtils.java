@@ -3,8 +3,11 @@ package io.tradle.joe.utils;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
 import java.util.Arrays;
 
+import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
 import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.PBEKeySpec;
@@ -29,6 +32,8 @@ import org.spongycastle.crypto.params.ParametersWithIV;
  */
 public class AESUtils {
 
+  private static final SecureRandom random = new SecureRandom();
+	
   /**
    * Key length in bytes.
    */
@@ -74,6 +79,9 @@ public class AESUtils {
     checkNotNull(initialisationVector);
     checkState(initialisationVector.length == BLOCK_LENGTH, "The initialisationVector must be " + BLOCK_LENGTH + " bytes long.");
 
+	System.out.println("Encrypting: " + Arrays.toString(plainBytes));
+	System.out.println("Encrypting with: " + Arrays.toString(aesKey.getKey()));
+
     try {
       ParametersWithIV keyWithIv = new ParametersWithIV(aesKey, initialisationVector);
 
@@ -90,6 +98,14 @@ public class AESUtils {
     }
 
   }
+  
+  public static byte[] encrypt(byte[] data, byte[] aesKey) throws KeyCrypterException {
+	  return encrypt(data, new KeyParameter(aesKey));
+  }
+
+  public static byte[] encrypt(byte[] data, KeyParameter aesKey) throws KeyCrypterException {
+	  return encrypt(data, aesKey, AES_INITIALISATION_VECTOR);
+  }
 
   /**
    * Decrypt bytes previously encrypted with this class.
@@ -104,10 +120,12 @@ public class AESUtils {
    */
 
   public static byte[] decrypt(byte[] encryptedBytes, KeyParameter aesKey, byte[] initialisationVector) throws KeyCrypterException {
-
     checkNotNull(encryptedBytes);
     checkNotNull(aesKey);
     checkNotNull(initialisationVector);
+
+	System.out.println("Decrypting: " + Arrays.toString(encryptedBytes));
+	System.out.println("Decrypting with: " + Arrays.toString(aesKey.getKey()));
 
     try {
       ParametersWithIV keyWithIv = new ParametersWithIV(new KeyParameter(aesKey.getKey()), initialisationVector);
@@ -130,7 +148,15 @@ public class AESUtils {
       throw new KeyCrypterException("Could not decrypt bytes", e);
     }
   }
-  
+	
+  public static byte[] decrypt(byte[] data, byte[] aesKey) throws KeyCrypterException {
+	  return decrypt(data, new KeyParameter(aesKey));
+  }
+
+  public static byte[] decrypt(byte[] data, KeyParameter aesKey) throws KeyCrypterException {
+	  return decrypt(data, aesKey, AES_INITIALISATION_VECTOR);
+  }
+
   public static SecretKey generateKey(char[] password) {
 	  try {
 		  SecretKeyFactory kf = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA1");
@@ -141,6 +167,18 @@ public class AESUtils {
 		  // should never happen but...
 		  throw new IllegalArgumentException("failed to generate AES key from password", e);
 	  }
+  }
+  
+  public static SecretKey generateKey() {
+		KeyGenerator gen;
+		try {
+			gen = KeyGenerator.getInstance("AES");
+		} catch (NoSuchAlgorithmException e) {
+			throw new IllegalStateException("Failed to get generator for algorithm", e);
+		}
+		
+		gen.init(random);
+		return gen.generateKey();
   }
 
 }

@@ -7,19 +7,41 @@ import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.logging.LogLevel;
 import io.netty.handler.logging.LoggingHandler;
-import io.netty.handler.ssl.SslContext;
-import io.netty.handler.ssl.util.SelfSignedCertificate;
 import io.tradle.joe.Joe;
 
-import org.bitcoinj.kits.WalletAppKit;
+import java.util.List;
+
+import org.bitcoinj.core.Address;
+import org.bitcoinj.core.ECKey;
+import org.bitcoinj.core.Transaction;
+import org.bitcoinj.core.Wallet.SendRequest;
+import org.bitcoinj.crypto.DeterministicKey;
 import org.bitcoinj.utils.BriefLogFormatter;
+import org.spongycastle.math.ec.ECPoint;
+import org.spongycastle.util.encoders.Hex;
 
 public final class JoeServer {
-
+	
     public static void main(String[] args) throws Exception {
         // This line makes the log output more compact and easily read, especially when using the JDK log adapter.
         BriefLogFormatter.init();
+        
+        List<DeterministicKey> leafKeys = Joe.JOE.wallet().getActiveKeychain().getLeafKeys();
+        int numKeys = leafKeys.size();
+        numKeys = Math.min(numKeys, 5);
+        System.out.println("Some of my public keys, format:   (public key    :   address)");
+
+        // Print out a few public keys
+        List<DeterministicKey> keys = Joe.JOE.wallet().getActiveKeychain().getLeafKeys();
+        for (int i = 0; i < 5; i++) {
+        	ECKey key = keys.get(i);
+	    	ECPoint pt = key.getPubKeyPoint();
+	    	String pubKey = new String(Hex.encode(pt.getEncoded(true)));
+	        System.out.println(pubKey + "  :  " + key.toAddress(Joe.JOE.params()));
+        }
+        
         System.out.println("Wallet balance: " + Joe.JOE.wallet().getBalance().toFriendlyString());
+        System.out.println("Send coins to: " + Joe.JOE.wallet().currentReceiveAddress());
         
         EventLoopGroup bossGroup = new NioEventLoopGroup(1);
         EventLoopGroup workerGroup = new NioEventLoopGroup();
@@ -32,7 +54,7 @@ public final class JoeServer {
 
             Channel ch = b.bind(Joe.JOE.config().address().port()).sync().channel();
 
-            System.err.println("Open your web browser and navigate to " + Joe.JOE.config().address());
+            System.err.println("Open your web browser and navigate to " + Joe.JOE.config().address() + "create.json?data={json-formatted-data}");
 
             ch.closeFuture().sync();
         } finally {
@@ -41,3 +63,4 @@ public final class JoeServer {
         }
     }
 }
+	

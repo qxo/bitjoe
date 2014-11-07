@@ -1,0 +1,19 @@
+package webhooks;
+
+option java_package = "io.tradle.joe.protocols";
+option java_outer_classname = "WebHookProtos";
+
+enum Event {
+	NewKey = 0;
+	NewValue = 1;
+}
+
+message WebHook {
+	required string url = 1;
+	required Event event = 2;
+	optional int32 timeoutsCount = 3;
+}
+
+message WebHooks {
+	repeated WebHook webHooks = 1;
+}
