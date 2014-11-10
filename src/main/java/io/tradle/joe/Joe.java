@@ -2,22 +2,22 @@ package io.tradle.joe;
 
 import io.netty.util.CharsetUtil;
 import io.tradle.joe.Config.WebHooksConfig;
+import io.tradle.joe.events.KeyValue;
 import io.tradle.joe.extensions.WebHooksExtension;
-import io.tradle.joe.sharing.ShareRequest;
-import io.tradle.joe.sharing.ShareResult;
+import io.tradle.joe.protocols.WebHookProtos.Event;
 import io.tradle.joe.sharing.StoragePipe;
+import io.tradle.joe.utils.Gsons;
 import io.tradle.joe.utils.TransactionUtils;
+import io.tradle.joe.utils.Utils;
 
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.util.List;
-import java.util.Map;
 
 import org.bitcoinj.core.AbstractWalletEventListener;
 import org.bitcoinj.core.Coin;
-import org.bitcoinj.core.InsufficientMoneyException;
 import org.bitcoinj.core.NetworkParameters;
 import org.bitcoinj.core.Transaction;
 import org.bitcoinj.core.TransactionOutput;
@@ -25,14 +25,11 @@ import org.bitcoinj.core.Wallet;
 import org.bitcoinj.core.WalletExtension;
 import org.bitcoinj.kits.WalletAppKit;
 import org.bitcoinj.params.MainNetParams;
+import org.bitcoinj.params.TestNet3Params;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.google.common.collect.ImmutableList;
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-
-import static com.google.common.base.Preconditions.checkNotNull;
 
 public enum Joe {
 
@@ -47,15 +44,15 @@ public enum Joe {
 	private Wallet wallet;
 	private NetworkParameters networkParams;
 	private WebHooksExtension webHooks;
+	private long DIME = (long) Math.pow(10, 7); // 0.1 BTC
 	
 	public byte[] getDataPrefix() {
 		return config.prefix().getBytes(CharsetUtil.UTF_8);
 	}
 	
 	private Joe() {
-		Gson gson = new GsonBuilder().create();
         try {
-			this.config = gson.fromJson(new BufferedReader(new FileReader(CONFIG_PATH)), Config.class);
+			this.config = Gsons.ugly().fromJson(new BufferedReader(new FileReader(CONFIG_PATH)), Config.class);
 		} catch (FileNotFoundException e) {
 			throw new IllegalStateException("couldn't find config file at path: " + CONFIG_PATH);
 		}
@@ -77,6 +74,13 @@ public enum Joe {
 		
 		wallet = kit.wallet();
 		storagePipe = new StoragePipe(wallet);
+        if (TestNet3Params.get().equals(params()) && wallet.getBalance().isLessThan(Coin.CENT)) {
+        	try {
+        		Utils.getTestnetCoins(DIME, wallet.currentReceiveAddress().toString());
+        	} catch (Exception e) {
+        		logger.error("Failed to charge wallet from testnet faucet: " + e.getMessage());
+        	}
+        }
 		
 		webHooks = (WebHooksExtension) wallet.addOrGetExistingExtension(new WebHooksExtension());
 		List<WebHooksConfig> webHookConfigs = config.webHooks();
@@ -89,11 +93,17 @@ public enum Joe {
 		kit.wallet().addEventListener(new AbstractWalletEventListener() {
             @Override
             public void onCoinsReceived(Wallet wallet, Transaction tx, Coin prevBalance, Coin newBalance) {
+            	if (!webHooks.hasHooks(Event.KeyValue))
+            		return;
+            	
             	System.out.println("\nReceived tx " + tx.getHashAsString());
             	System.out.println(tx.toString());
             	if (TransactionUtils.getSentByMe(wallet, tx).isEmpty() || TransactionUtils.getReceived(wallet, tx).size() > 1) {
             		// if this transaction wasn't sent by me, or sent from me to me
-	    			receiveData(tx);
+        		
+	    			KeyValue keyValue = receiveData(tx);
+	    			if (keyValue != null)
+	    				webHooks.notifyHooks(Event.KeyValue, keyValue);
             	}
             }
 
@@ -132,16 +142,11 @@ public enum Joe {
 		return !MainNetParams.get().equals(JOE.params());
 	}
 
-	public void receiveData(Transaction tx) {
-		storagePipe.receiveData(tx);
-	}
-
-	public ShareRequest storeData(byte[] data) throws InsufficientMoneyException {
-		return new ShareRequest.Builder(wallet).store(data)
-											   .build();
-	}
-
 	public WebHooksExtension webHooks() {
 		return webHooks;
+	}
+
+	public KeyValue receiveData(Transaction t) {
+		return storagePipe.receiveData(t);
 	}
 }

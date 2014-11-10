@@ -24,7 +24,6 @@ public class ECUtils {
 	public static byte[] getSharedSecret(ECPoint pubKey, BigInteger privKey) {
 		ECPoint sharedSecret = pubKey.multiply(privKey).normalize();
 		byte[] shared = SHA256.getHash(sharedSecret.getEncoded(true), false);
-		System.out.println("Shared secret: " + Arrays.toString(shared));
 		return shared;
 	}	
 

@@ -10,13 +10,16 @@ import io.netty.handler.logging.LoggingHandler;
 import io.tradle.joe.Joe;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
-import org.bitcoinj.core.Address;
 import org.bitcoinj.core.ECKey;
+import org.bitcoinj.core.Sha256Hash;
 import org.bitcoinj.core.Transaction;
-import org.bitcoinj.core.Wallet.SendRequest;
+import org.bitcoinj.core.Wallet;
 import org.bitcoinj.crypto.DeterministicKey;
 import org.bitcoinj.utils.BriefLogFormatter;
+import org.bitcoinj.wallet.WalletTransaction.Pool;
 import org.spongycastle.math.ec.ECPoint;
 import org.spongycastle.util.encoders.Hex;
 
@@ -31,7 +34,7 @@ public final class JoeServer {
         numKeys = Math.min(numKeys, 5);
         System.out.println("Some of my public keys, format:   (public key    :   address)");
 
-        // Print out a few public keys
+        // Print out a few public keys so we can play around with sharing data
         List<DeterministicKey> keys = Joe.JOE.wallet().getActiveKeychain().getLeafKeys();
         for (int i = 0; i < 5; i++) {
         	ECKey key = keys.get(i);
@@ -42,6 +45,13 @@ public final class JoeServer {
         
         System.out.println("Wallet balance: " + Joe.JOE.wallet().getBalance().toFriendlyString());
         System.out.println("Send coins to: " + Joe.JOE.wallet().currentReceiveAddress());
+//        Wallet wallet = Joe.JOE.wallet();
+//        Map<Sha256Hash, Transaction> dead = wallet.getTransactionPool(Pool.DEAD);
+//        Set<Transaction> transactions = wallet.getTransactions(true);
+//        for (Transaction t: transactions) {
+//        	if (t.isPending())
+//        		t = t;
+//        }
         
         EventLoopGroup bossGroup = new NioEventLoopGroup(1);
         EventLoopGroup workerGroup = new NioEventLoopGroup();

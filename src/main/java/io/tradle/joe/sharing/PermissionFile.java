@@ -2,6 +2,7 @@ package io.tradle.joe.sharing;
 
 import io.netty.util.CharsetUtil;
 import io.tradle.joe.utils.AESUtils;
+import io.tradle.joe.utils.Gsons;
 
 import java.nio.charset.Charset;
 
@@ -12,18 +13,18 @@ import org.spongycastle.crypto.params.KeyParameter;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonElement;
 
-public class IntermediateFile {
+public class PermissionFile {
 
-	private IntermediateFileData fileData;
+	private PermissionFileData fileData;
 	private JsonElement json;
 	private String ciphertext;
 	private byte[] ciphertextBytes;
 	private byte[] hashBytes;
 	private String hash;
 
-	public IntermediateFile(String fileHash, String decryptionKey) {
-		this.fileData = new IntermediateFileData(fileHash, decryptionKey);
-		this.json = new GsonBuilder().create().toJsonTree(fileData, IntermediateFileData.class);
+	public PermissionFile(String fileHash, String decryptionKey) {
+		this.fileData = new PermissionFileData(fileHash, decryptionKey);
+		this.json = Gsons.ugly().toJsonTree(fileData, PermissionFileData.class);
 	}
 
 	public JsonElement toJson() {

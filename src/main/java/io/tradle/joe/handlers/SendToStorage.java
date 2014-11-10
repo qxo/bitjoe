@@ -14,12 +14,15 @@ import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.util.CharsetUtil;
 import io.tradle.joe.Joe;
+import io.tradle.joe.events.KeyValue;
 import io.tradle.joe.extensions.WebHooksExtension;
 import io.tradle.joe.protocols.WebHookProtos.Event;
 import io.tradle.joe.requests.TransactionRequest;
 import io.tradle.joe.responses.TransactionResponse;
+import io.tradle.joe.sharing.Permission;
 import io.tradle.joe.sharing.ShareRequest;
 import io.tradle.joe.sharing.ShareResult;
+import io.tradle.joe.utils.Gsons;
 
 import java.util.Map;
 
@@ -27,8 +30,6 @@ import org.bitcoinj.core.Wallet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
@@ -36,9 +37,6 @@ import com.google.gson.JsonObject;
 public class SendToStorage extends SimpleChannelInboundHandler<TransactionRequest> {
 
 	private final Logger logger = LoggerFactory.getLogger(SendToStorage.class);
-	private final Gson gson = new GsonBuilder().setPrettyPrinting()
-										   	   .disableHtmlEscaping()
-										       .create();
 
 	public SendToStorage() {
 		super(false); // do not release msg object since it's passed through
@@ -53,24 +51,24 @@ public class SendToStorage extends SimpleChannelInboundHandler<TransactionReques
 		
 		WebHooksExtension webHooks = Joe.JOE.webHooks();
 		if (webHooks != null)
-			webHooks.notifyHooks(Event.NewValue, req.data());
+			webHooks.notifyHooks(Event.KeyValue, new KeyValue(req.key(), req.data()));
 		
 		Wallet wallet = Joe.JOE.wallet();
-		ShareRequest share = new ShareRequest.Builder(wallet)
+		ShareResult share = new ShareRequest(wallet)
 											 .store(data)
 											 .shareWith(req.to())
 											 .cleartext(req.cleartext())
-											 .build();
+											 .execute();
 		
-		jResp.add("file", gson.toJsonTree(new TransactionResponse(null, share.fileKey())));		
+		jResp.add("file", Gsons.ugly().toJsonTree(new TransactionResponse(null, share.fileKey())));		
 		
-		Map<String, ShareResult> results = share.results();
+		Map<String, Permission> results = share.results();
 		if (!results.isEmpty()) {
 			jResp.add("permissions", jResults);
 			for (String pubKey: results.keySet()) {
-				ShareResult result = results.get(pubKey);
+				Permission result = results.get(pubKey);
 				TransactionResponse resp = new TransactionResponse(result.sendResult(), result.keyInStorage());
-				JsonElement oneResp = gson.toJsonTree(resp, TransactionResponse.class);
+				JsonElement oneResp = Gsons.ugly().toJsonTree(resp, TransactionResponse.class);
 				jResults.add(pubKey, oneResp);
 			}
 		}
@@ -82,7 +80,7 @@ public class SendToStorage extends SimpleChannelInboundHandler<TransactionReques
 		// Build the response object.
 		FullHttpResponse response = new DefaultFullHttpResponse(HTTP_1_1, 
 				req.getDecoderResult().isSuccess() ? OK : BAD_REQUEST,
-				Unpooled.copiedBuffer(gson.toJson(resp) + "\n", CharsetUtil.UTF_8));
+				Unpooled.copiedBuffer(Gsons.pretty().toJson(resp) + "\n", CharsetUtil.UTF_8));
 
 		response.headers().set(CONTENT_TYPE, "application/json; charset=UTF-8");
 		ctx.writeAndFlush(response).addListener(ChannelFutureListener.CLOSE);

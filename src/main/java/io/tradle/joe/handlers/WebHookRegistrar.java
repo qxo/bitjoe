@@ -15,6 +15,7 @@ import io.netty.util.CharsetUtil;
 import io.tradle.joe.Joe;
 import io.tradle.joe.extensions.WebHooksExtension;
 import io.tradle.joe.requests.WebHookRequest;
+import io.tradle.joe.utils.Gsons;
 import io.tradle.joe.utils.HttpResponseData;
 
 import org.bitcoinj.core.Wallet;
@@ -30,13 +31,7 @@ public class WebHookRegistrar extends SimpleChannelInboundHandler<WebHookRequest
 	protected void channelRead0(ChannelHandlerContext ctx, WebHookRequest req) throws Exception {
 		Wallet wallet = Joe.JOE.wallet();
 		WebHooksExtension webHooks = (WebHooksExtension) wallet.getExtensions().get(WebHooksExtension.EXTENSION_ID);
-//		if (wallet.getExtensions().containsKey(WebHooksExtension.EXTENSION_ID))
-//			webHooks = (WebHooksExtension) wallet.getExtensions().get(WebHooksExtension.EXTENSION_ID);
-//		else {
-//			webHooks = new WebHooksExtension(wallet);
-//			wallet.addExtension(webHooks);
-//		}
-//
+
 //		switch (req.type()) {
 //		case Clear:
 //			webHooks.removeAll(req.url());
@@ -51,7 +46,7 @@ public class WebHookRegistrar extends SimpleChannelInboundHandler<WebHookRequest
 		
         FullHttpResponse response = new DefaultFullHttpResponse(
                 HTTP_1_1, req.httpRequest().getDecoderResult().isSuccess()? OK : BAD_REQUEST,
-                Unpooled.copiedBuffer(new HttpResponseData(200, "OK").toJsonString(), CharsetUtil.UTF_8));
+                Unpooled.copiedBuffer(Gsons.pretty().toJson(new HttpResponseData(200, "OK")), CharsetUtil.UTF_8));
 
         response.headers().set(CONTENT_TYPE, "application/json; charset=UTF-8");
         ctx.writeAndFlush(response).addListener(ChannelFutureListener.CLOSE);

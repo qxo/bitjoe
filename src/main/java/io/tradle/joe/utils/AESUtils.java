@@ -79,9 +79,6 @@ public class AESUtils {
     checkNotNull(initialisationVector);
     checkState(initialisationVector.length == BLOCK_LENGTH, "The initialisationVector must be " + BLOCK_LENGTH + " bytes long.");
 
-	System.out.println("Encrypting: " + Arrays.toString(plainBytes));
-	System.out.println("Encrypting with: " + Arrays.toString(aesKey.getKey()));
-
     try {
       ParametersWithIV keyWithIv = new ParametersWithIV(aesKey, initialisationVector);
 
@@ -123,9 +120,6 @@ public class AESUtils {
     checkNotNull(encryptedBytes);
     checkNotNull(aesKey);
     checkNotNull(initialisationVector);
-
-	System.out.println("Decrypting: " + Arrays.toString(encryptedBytes));
-	System.out.println("Decrypting with: " + Arrays.toString(aesKey.getKey()));
 
     try {
       ParametersWithIV keyWithIv = new ParametersWithIV(new KeyParameter(aesKey.getKey()), initialisationVector);

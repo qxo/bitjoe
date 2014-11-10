@@ -18,7 +18,8 @@
 	"webHooks": [
 		{
 			"url": "http://127.0.0.1:8880",
-			"events": ["NewKey", "NewValue"]
+			"events": ["KeyValue", "Rewind"],
+			"unlimitedTimeouts": true
 		}
 	],
 

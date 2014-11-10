@@ -108,6 +108,7 @@ public class Config {
 	public static class WebHooksConfig {
 		String url;
 		Event[] events;
+		boolean unlimitedTimeouts;
 
 		public String url() {
 			return url;
@@ -115,6 +116,10 @@ public class Config {
 		
 		public Event[] events() {
 			return events;
+		}
+		
+		public boolean unlimitedTimeouts() {
+			return unlimitedTimeouts;
 		}
 	}
 	

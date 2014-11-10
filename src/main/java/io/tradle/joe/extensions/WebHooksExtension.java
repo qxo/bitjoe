@@ -2,6 +2,7 @@ package io.tradle.joe.extensions;
 
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.tradle.joe.Joe;
+import io.tradle.joe.events.JsonEventData;
 import io.tradle.joe.protocols.WebHookProtos.Event;
 import io.tradle.joe.protocols.WebHookProtos.WebHook;
 import io.tradle.joe.protocols.WebHookProtos.WebHooks;
@@ -14,19 +15,20 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import org.bitcoinj.core.Wallet;
 import org.bitcoinj.core.WalletExtension;
 
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
-import com.google.gson.JsonElement;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 
 public class WebHooksExtension implements WalletExtension {
 
 	public static final String EXTENSION_ID = WebHooksExtension.class.getName();
 	
+	private final Gson gson = new GsonBuilder().disableHtmlEscaping().create();
 	private final Multimap<String, WebHook> urlToWebHooks = HashMultimap.create();
 	private final Multimap<Event, WebHook> eventToWebHooks = HashMultimap.create();
 	
@@ -74,13 +76,13 @@ public class WebHooksExtension implements WalletExtension {
 			putWebHooks(replacements);
 	}
 
-	public void notifyHooks(Event event, JsonElement data) {
+	public void notifyHooks(Event event, JsonEventData data) {
 		Collection<WebHook> eventHooks = eventToWebHooks.get(event);
 		if (eventHooks == null || eventHooks.isEmpty())
 			return;
 		
 		Map<String, String> params = new HashMap<String, String>();
-		params.put("data", data.toString());
+		params.put("data", gson.toJson(data));
 		notifyHooks(eventHooks, params);
 	}
 	
@@ -102,7 +104,7 @@ public class WebHooksExtension implements WalletExtension {
 	@Override
 	public byte[] serializeWalletExtension() {
 		return WebHooks.newBuilder()
-//					   .addAllWebHooks(urlToWebHooks.values())
+					   .addAllWebHooks(urlToWebHooks.values())
 					   .build()
 					   .toByteArray();
 	}
@@ -191,34 +193,7 @@ public class WebHooksExtension implements WalletExtension {
 		return !urlToWebHooks.isEmpty();
 	}
 
-//	private void init() {
-//		Joe.JOE.addDataListener(new AbstractDataTransactionListener() {
-//			@Override
-//			public void onKeyReceived(Transaction tx, String key) {
-//				Collection<WebHook> newKeyHooks = eventToWebHooks.get(Event.NewKey);
-//				if (newKeyHooks == null || newKeyHooks.isEmpty())
-//					return;
-//				
-//				Map<String, String> params = new HashMap<String, String>();
-//				params.put("data", key);
-//				
-//				notifyHooks(newKeyHooks, params);
-//			}
-//			
-//			@Override
-//			public void onValueReceived(Transaction tx, String key, String value) {
-//				Collection<WebHook> newValHooks = eventToWebHooks.get(Event.NewValue);
-//				if (newValHooks == null || newValHooks.isEmpty())
-//					return;
-//				
-//				Map<String, String> params = new HashMap<String, String>();
-//				JsonObject keyVal = new JsonObject();
-//				keyVal.addProperty("key", key);
-//				keyVal.addProperty("value", value);
-//				params.put("data", keyVal.toString());
-//				
-//				notifyHooks(newValHooks, params);
-//			}
-//		});	
-//	}
+	public boolean hasHooks(Event event) {
+		return eventToWebHooks.containsKey(event);
+	}
 }

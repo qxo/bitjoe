@@ -2,27 +2,23 @@ package io.tradle.joe.sharing;
 
 import io.tradle.joe.utils.HttpResponseData;
 
-import org.bitcoinj.core.Wallet.SendResult;
+import java.util.Map;
 
 public class ShareResult {
 
-	private final IntermediateFile intermediateFile;
-	private final SendResult sendResult;
-	
-	public ShareResult(SendResult sendResult, IntermediateFile intermediateFile) {
-		this.sendResult = sendResult;
-		this.intermediateFile = intermediateFile;
+	private final Map<String, Permission> results;
+	private final String fileKey;
+
+	public ShareResult(String fileKey, Map<String, Permission> results) {
+		this.fileKey = fileKey;
+		this.results = results;
 	}
 
-	public SendResult sendResult() {
-		return sendResult;
+	public Map<String, Permission> results() {
+		return results;
 	}
 	
-	public String keyInStorage() {
-		return intermediateFile.hash();
-	}
-	
-	public IntermediateFile intermediateFile() {
-		return intermediateFile;
+	public String fileKey() {
+		return fileKey;
 	}
 }

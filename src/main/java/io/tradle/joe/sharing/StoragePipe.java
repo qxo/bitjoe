@@ -4,11 +4,12 @@ import io.netty.handler.codec.http.QueryStringEncoder;
 import io.netty.util.CharsetUtil;
 import io.tradle.joe.Config;
 import io.tradle.joe.Joe;
+import io.tradle.joe.events.KeyValue;
 import io.tradle.joe.exceptions.StorageException;
 import io.tradle.joe.extensions.WebHooksExtension;
-import io.tradle.joe.protocols.WebHookProtos.Event;
 import io.tradle.joe.utils.AESUtils;
 import io.tradle.joe.utils.ECUtils;
+import io.tradle.joe.utils.Gsons;
 import io.tradle.joe.utils.HttpResponseData;
 import io.tradle.joe.utils.TransactionUtils;
 import io.tradle.joe.utils.Utils;
@@ -16,6 +17,7 @@ import io.tradle.joe.utils.Utils;
 import java.math.BigInteger;
 import java.net.URISyntaxException;
 import java.nio.charset.Charset;
+import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.commons.codec.binary.Base64;
@@ -27,7 +29,6 @@ import org.bitcoinj.core.Transaction;
 import org.bitcoinj.core.TransactionInput;
 import org.bitcoinj.core.TransactionOutput;
 import org.bitcoinj.core.Wallet;
-import org.bitcoinj.kits.WalletAppKit;
 import org.bitcoinj.wallet.DecryptingKeyBag;
 import org.bitcoinj.wallet.KeyBag;
 import org.h2.security.SHA256;
@@ -36,7 +37,7 @@ import org.slf4j.LoggerFactory;
 import org.spongycastle.crypto.params.KeyParameter;
 import org.spongycastle.util.encoders.Hex;
 
-import com.google.gson.GsonBuilder;
+import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonParser;
 
@@ -46,7 +47,6 @@ public class StoragePipe {
 	public static final Charset FILE_ENCODING = CharsetUtil.UTF_8;
 
 	private final Wallet wallet;
-	private final WebHooksExtension webHooks;
 	private final NetworkParameters params;
 	private final JsonParser jsonParser;
 
@@ -54,44 +54,99 @@ public class StoragePipe {
 		this.wallet = wallet;
 		jsonParser = new JsonParser();
 		params = wallet.getNetworkParameters();
-		
-		this.webHooks = (WebHooksExtension) wallet.getExtensions().get(WebHooksExtension.EXTENSION_ID);
 	}
 
-	public void receiveData(Transaction tx) {
+	public KeyValue receiveData(Transaction tx) {
 		byte[] hash = TransactionUtils.getDataFromTransaction(tx);
 		if (hash == null)
-			return;
+			return null;
 		
-		receiveData(tx, hash);
+		return receiveData(tx, hash);
 	}
 	
-	public void receiveData(Transaction tx, byte[] intermediateFileHash) {
-		if (!webHooks.hasHooks()) {
-			// TODO: check for specific event
-			return;
+	public List<KeyValue> receiveData(List<Transaction> txs) {
+		int numTxs = txs.size();
+		List<byte[]> hashes = new ArrayList<byte[]>();
+		for (Transaction t: txs) {
+			hashes.add(TransactionUtils.getDataFromTransaction(t));
+		}
+
+		StringBuilder intermediateKeys = new StringBuilder();
+		for (int i = 0; i < numTxs; i++) {
+			byte[] iHash = hashes.get(i);
+			if (iHash == null)
+				continue;
+
+			intermediateKeys.append(TransactionUtils.transactionDataToString(iHash));
+			intermediateKeys.append(",");
 		}
 		
+		if (intermediateKeys.length() == 0)
+			return null;
+			
+		JsonArray iFiles = fetchFiles(intermediateKeys.substring(0, intermediateKeys.length() - 1));
+		List<String> decryptionKeys = new ArrayList<String>();
+
+		for (int i = 0; i < numTxs; i++) {
+			String iFile = iFiles.get(i).getAsString();
+			String dKey = null;
+			if (iFile != null) {
+				Transaction t = txs.get(i);
+				PermissionFileData iData = getIntermediateFileData(t, iFile);
+				byte[] fileHash = keyToBytes(iData.fileHash());
+				hashes.set(i, fileHash);
+				dKey = iData.decryptionKey();
+			}
+			
+			decryptionKeys.add(dKey);
+		}
+		
+		StringBuilder keys = new StringBuilder();
+		for (int i = 0; i < numTxs; i++) {
+			String dKey = decryptionKeys.get(i);
+			if (dKey != null) {
+				keys.append(keyToString(hashes.get(i)));
+				keys.append(",");
+			}
+		}
+		
+		if (keys.length() == 0)
+			return null;
+
+		List<KeyValue> data = new ArrayList<KeyValue>();
+		JsonArray files = fetchFiles(keys.substring(0, keys.length() - 1));
+		for (int i = 0; i < numTxs; i++) {
+			String file = files.get(0).getAsString();
+			String dKey = decryptionKeys.get(i);
+			file = decryptFile(file, dKey);
+			data.add(new KeyValue(keyToString(hashes.get(i)), file));
+		}
+		
+		return data;
+	}
+
+	public KeyValue receiveData(Transaction tx, byte[] intermediateFileHash) {
 		String intermediateFile = fetchFile(intermediateFileHash);
 		if (intermediateFile == null)
-			return;
+			return null;
 		
-		byte[] secret = getSharedSecret(tx);
-		KeyParameter key = new KeyParameter(secret);
-		intermediateFile = decryptFile(intermediateFile, key);
-		System.out.println("Decrypted intermediate file: " + intermediateFile);
-		
-		// at this point, decrypted is the value of the intermediate file
-		IntermediateFileData iData = new GsonBuilder().create().fromJson(intermediateFile, IntermediateFileData.class);
+		PermissionFileData iData = getIntermediateFileData(tx, intermediateFile);
 		String dKey = iData.decryptionKey();
 		byte[] fileHash = keyToBytes(iData.fileHash());
 		String file = fetchFile(fileHash);
 		if (file == null)
-			return;
+			return null;
 		
 		file = decryptFile(file, dKey);
-		webHooks.notifyHooks(Event.NewValue, parseJson(file));
-		System.out.println("Decrypted file: " + file);
+		return new KeyValue(iData.fileHash(), file);
+	}
+	
+	private PermissionFileData getIntermediateFileData(Transaction tx, String encryptedIntermediateFile) {
+		byte[] secret = getSharedSecret(tx);
+		KeyParameter key = new KeyParameter(secret);
+		String decryptedIntermediateFile = decryptFile(encryptedIntermediateFile, key);
+		System.out.println("Decrypted intermediate file: " + decryptedIntermediateFile);
+		return Gsons.ugly().fromJson(decryptedIntermediateFile, PermissionFileData.class);
 	}
 
 	private JsonElement parseJson(String file) {
@@ -119,6 +174,27 @@ public class StoragePipe {
 		}
 		
 		return response.response(); 
+	}
+	
+	private JsonArray fetchFiles(String keysCsv) {
+		Config config = Joe.JOE.config();
+		QueryStringEncoder qs = new QueryStringEncoder(config.keepers().get(0).toString());
+		qs.addParam("keys", keysCsv);
+
+		HttpResponseData response = null;
+		try {
+			response = Utils.get(qs.toUri());
+		} catch (URISyntaxException e) {
+			logger.error("Constructed bad URI: " + qs, e);
+			throw new StorageException("constructed bad URI for fetching file from keeper", e);
+		}
+
+		if (response.code() > 399) {
+			logger.error("Hashes not found in storage: " + keysCsv);
+			return null;
+		}
+		
+		return (JsonArray) new JsonParser().parse(response.response()); 		
 	}
 	
 	private String decryptFile(String file, String decryptionKey) {
@@ -205,6 +281,17 @@ public class StoragePipe {
 			// should never happen...
 			throw new IllegalArgumentException("invalid keeper url", e);
 		}
+	}
+
+	public static String getStorageKeyStringFor(String file) {
+		return keyToString(
+				getStorageKeyFor(
+				  fileStringToBytes(file)));
+	}
+
+	public static String getStorageKeyStringFor(byte[] data) {
+		return keyToString(
+				getStorageKeyFor(data));
 	}
 
 	public static byte[] getStorageKeyFor(byte[] data) {

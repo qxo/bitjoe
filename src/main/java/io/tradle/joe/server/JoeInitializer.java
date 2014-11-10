@@ -7,27 +7,27 @@ import io.netty.handler.codec.http.HttpContentCompressor;
 import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.codec.http.HttpRequestDecoder;
 import io.netty.handler.codec.http.HttpResponseEncoder;
+import io.tradle.joe.handlers.BootstrapRequestHandler;
 import io.tradle.joe.handlers.DefaultExceptionHandler;
 import io.tradle.joe.handlers.FundsCheck;
-import io.tradle.joe.handlers.RequestFilter;
+import io.tradle.joe.handlers.PathFinder;
 import io.tradle.joe.handlers.SendToStorage;
-import io.tradle.joe.handlers.TransactionRequestDecoder;
 import io.tradle.joe.handlers.WebHookRegistrar;
 
 public class JoeInitializer extends ChannelInitializer<SocketChannel> {
 	
-	private final RequestFilter reqFilter;
+	private final PathFinder reqFilter;
 	private final WebHookRegistrar webHookRegistrar;
 	private final FundsCheck fundsCheck;
-	private final TransactionRequestDecoder transactionReqDecoder;
+	private final BootstrapRequestHandler bootstrapReqHandler;
 	private final SendToStorage sendToStorage;
 	private final DefaultExceptionHandler exceptionHandler;
 			
 	public JoeInitializer() {
 		super();
-		reqFilter = new RequestFilter();
+		reqFilter = new PathFinder();
 		webHookRegistrar = new WebHookRegistrar();
-		transactionReqDecoder = new TransactionRequestDecoder();
+		bootstrapReqHandler = new BootstrapRequestHandler();
 		fundsCheck = new FundsCheck();
 		sendToStorage = new SendToStorage();
 		exceptionHandler = new DefaultExceptionHandler();
@@ -42,7 +42,7 @@ public class JoeInitializer extends ChannelInitializer<SocketChannel> {
 		 .addLast(new HttpContentCompressor())
 		 .addLast(reqFilter) 					// filter out requests from remote ips, non-POST requests, etc.
 		 .addLast(webHookRegistrar) 			// handle webhook reg/unreg requests
-		 .addLast(transactionReqDecoder)		// parse
+		 .addLast(bootstrapReqHandler) 			// handle webhook reg/unreg requests
 		 .addLast(fundsCheck)					// check if we have the funds to pay for the transaction
 		 .addLast(sendToStorage)				// send to keeper network, put hash on blockchain
 		 .addLast(exceptionHandler);

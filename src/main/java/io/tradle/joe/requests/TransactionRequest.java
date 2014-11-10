@@ -2,6 +2,7 @@ package io.tradle.joe.requests;
 
 import io.netty.handler.codec.http.HttpRequest;
 import io.tradle.joe.exceptions.InvalidTransactionRequestException;
+import io.tradle.joe.sharing.StoragePipe;
 import io.tradle.joe.utils.Utils;
 
 import java.util.List;
@@ -17,51 +18,44 @@ import com.google.gson.JsonSyntaxException;
 /**
  * Parses the transaction request
  */
-public class TransactionRequest {
+public class TransactionRequest extends AbstractRequest {
 
 	private final JsonObject json;
-	private final HttpRequest req;
+	private final String key;
 	private final boolean storeInCleartext;
 	private List<String> to;
-	private Map<String, String> parameters;
 
 	public TransactionRequest(HttpRequest req) {
-		this.req = req;		
-		
-		parameters = Utils.getRequestParameters(req);
-		String jsonString = parameters.get("data");
-    	JsonParser parser = new JsonParser();
-    	try {
-    		json = (JsonObject) parser.parse(jsonString);
-    	} catch (JsonSyntaxException j) {
-    		throw new InvalidTransactionRequestException("request contained malformed json");
-    	}
+		super(req);
+		String jsonString = param("data");
+		JsonParser parser = new JsonParser();
+		try {
+			json = (JsonObject) parser.parse(jsonString);
+		} catch (JsonSyntaxException j) {
+			throw new InvalidTransactionRequestException("request contained malformed json");
+		}
 
-    	String toCSV = parameters.get("to");
-    	if (toCSV != null) {
+		String toCSV = param("to");
+		if (toCSV != null) {
 			String[] to = toCSV.split(",");
 			this.to = ImmutableList.copyOf(to);
-    	}
-    	else
-    		this.to = ImmutableList.of();
-    	
-    	storeInCleartext = Utils.isTruthy(parameters.get("cleartext"));
+		} else
+			this.to = ImmutableList.of();
+
+		storeInCleartext = Utils.isTruthy(param("cleartext"));
+		this.key = StoragePipe.getStorageKeyStringFor(json.toString());
 	}
-	
+
+	public String key() {
+		return key;
+	}
+
 	public JsonObject data() {
 		return json;
 	}
 
-	public HttpRequest httpRequest() {
-		return req;
-	}
-	
 	public List<String> to() {
 		return to;
-	}
-	
-	public String param(String name) {
-		return parameters.get(name);
 	}
 
 	public boolean cleartext() {

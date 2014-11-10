@@ -15,6 +15,7 @@ import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.util.CharsetUtil;
 import io.tradle.joe.exceptions.BadRequestException;
 import io.tradle.joe.utils.HttpResponseData;
+import io.tradle.joe.utils.Gsons;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
@@ -32,7 +33,7 @@ public class DefaultExceptionHandler extends ChannelInboundHandlerAdapter {
 		logger.error("Exception caught", cause);
 
 		HttpResponseStatus status = (cause instanceof BadRequestException) ? BAD_REQUEST : INTERNAL_SERVER_ERROR;
-		String content = new HttpResponseData(status.code(), cause.getMessage()).toJsonString(true) + "\n";
+		String content = Gsons.pretty().toJson(new HttpResponseData(status.code(), cause.getMessage())) + "\n";
 
 		FullHttpResponse response = new DefaultFullHttpResponse(HTTP_1_1, status, Unpooled.copiedBuffer(content, CharsetUtil.UTF_8));
 

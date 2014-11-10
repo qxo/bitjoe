@@ -3,13 +3,13 @@ package io.tradle.joe.utils;
 import io.tradle.joe.Config;
 import io.tradle.joe.Joe;
 
-import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
 import org.bitcoinj.core.Base58;
 import org.bitcoinj.core.Coin;
+import org.bitcoinj.core.ECKey;
 import org.bitcoinj.core.Transaction;
 import org.bitcoinj.core.TransactionBag;
 import org.bitcoinj.core.TransactionInput;
@@ -189,10 +189,10 @@ public class TransactionUtils {
 		return false;
 	}
 	
-	public static BigInteger getPrivateKey(Wallet wallet, TransactionInput input) {
+	public static ECKey getKey(Wallet wallet, TransactionInput input) {
 //		KeyBag keyBag = new DecryptingKeyBag(wallet, null);
 		RedeemData redeemData = input.getConnectedRedeemData(wallet);
-        return redeemData.getFullKey().getPrivKey();
+        return redeemData.getFullKey();
 	}
 
 }

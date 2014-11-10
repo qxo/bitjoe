@@ -25,20 +25,4 @@ public class HttpResponseData {
 	public String response() {
 		return response;
 	}
-
-	public String toJsonString() {
-		return toJsonString(false);
-	}
-
-	public String toJsonString(boolean prettyPrint) {
-		if (json == null) {
-			GsonBuilder builder = new GsonBuilder();
-			if (prettyPrint)
-				builder.setPrettyPrinting();
-			
-			json = builder.create().toJson(this);
-		}
-		
-		return json;
-	}
 }

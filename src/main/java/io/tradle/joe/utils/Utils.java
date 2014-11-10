@@ -1,6 +1,14 @@
 package io.tradle.joe.utils;
 
+import static io.netty.handler.codec.http.HttpHeaders.Names.CONTENT_TYPE;
+import static io.netty.handler.codec.http.HttpResponseStatus.BAD_REQUEST;
+import static io.netty.handler.codec.http.HttpResponseStatus.OK;
+import static io.netty.handler.codec.http.HttpVersion.HTTP_1_1;
+import io.netty.buffer.Unpooled;
+import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.handler.codec.http.DefaultFullHttpResponse;
+import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.QueryStringDecoder;
@@ -8,6 +16,7 @@ import io.netty.handler.codec.http.multipart.Attribute;
 import io.netty.handler.codec.http.multipart.HttpPostRequestDecoder;
 import io.netty.handler.codec.http.multipart.InterfaceHttpData;
 import io.netty.handler.codec.http.multipart.InterfaceHttpData.HttpDataType;
+import io.netty.util.CharsetUtil;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -33,13 +42,22 @@ import org.apache.http.client.methods.HttpPost;
 import org.apache.http.client.methods.HttpUriRequest;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.message.BasicNameValuePair;
+import org.bitcoinj.core.Address;
+import org.bitcoinj.core.AddressFormatException;
 import org.bitcoinj.core.Base58;
-import org.bitcoinj.core.NetworkParameters;
+import org.bitcoinj.core.Coin;
+import org.bitcoinj.core.InsufficientMoneyException;
+import org.bitcoinj.core.Wallet;
+import org.bitcoinj.core.Wallet.SendRequest;
+import org.bitcoinj.core.Wallet.SendResult;
+import org.bitcoinj.params.TestNet3Params;
 
 //import io.netty.handler.codec.http.HttpHeaderUtil;
 
 public class Utils {
 
+	public static String TESTNET_FAUCET_RETURN_ADDRESS = "msj42CCGruhRsFrGATiUuh25dtxYtnpbTx";
+	
 	public static String getRemoteIPAddress(ChannelHandlerContext ctx) {
 		String fullAddress = ((InetSocketAddress) ctx.channel().remoteAddress())
 				.getAddress().getHostAddress();
@@ -125,6 +143,15 @@ public class Utils {
 		}
 
 		return new HttpResponseData(code, respStr);
+	}
+	
+	public static void writeResponse(ChannelHandlerContext ctx, HttpResponseData respData) {		
+		boolean ok = respData.code() > 0 && respData.code() < 399;
+		FullHttpResponse response = new DefaultFullHttpResponse(HTTP_1_1, ok ? OK : BAD_REQUEST,
+				Unpooled.copiedBuffer(Gsons.pretty().toJson(respData) + "\n", CharsetUtil.UTF_8));
+
+		response.headers().set(CONTENT_TYPE, "application/json; charset=UTF-8");
+		ctx.writeAndFlush(response).addListener(ChannelFutureListener.CLOSE);
 	}
 	
 	/**
@@ -251,5 +278,28 @@ public class Utils {
 			return b == null;
 		
 		return a.equals(b);
+	}
+	
+	public static void getTestnetCoins(long satoshis, String toAddress) {
+		Map<String, String> params = new HashMap<String, String>();
+		params.put("value", String.valueOf(satoshis));
+		params.put("toAddress", toAddress);
+		HttpResponseData resp = Utils.post("http://testnet.helloblock.io/v1/faucet/withdrawal", params);
+		if (resp.code() != 200)
+			throw new IllegalArgumentException("Failed to get testnet coins: " + resp.response());
+	}
+
+	public static SendResult returnTestnetCoins(Wallet wallet, long satoshis) throws InsufficientMoneyException {
+		if (!wallet.getNetworkParameters().equals(TestNet3Params.get()))
+			throw new IllegalArgumentException("Wallet is not on testnet, can't send coins to a different network");
+		
+		String addr = TESTNET_FAUCET_RETURN_ADDRESS;
+		try {
+			Address testNetAddr = new Address(wallet.getNetworkParameters(), addr);
+			return wallet.sendCoins(SendRequest.to(testNetAddr, Coin.valueOf(satoshis)));
+		} catch (AddressFormatException e) {
+			// should never happen, but...
+			throw new IllegalArgumentException("Invalid address: " + addr);
+		}
 	}
 }
