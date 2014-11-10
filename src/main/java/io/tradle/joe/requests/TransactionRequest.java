@@ -16,7 +16,7 @@ import com.google.gson.JsonParser;
 import com.google.gson.JsonSyntaxException;
 
 /**
- * Parses the transaction request
+ * Parses the transaction request - a request to store data and share it with an arbitrary number of parties
  */
 public class TransactionRequest extends AbstractRequest {
 
