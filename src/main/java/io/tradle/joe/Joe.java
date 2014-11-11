@@ -22,6 +22,7 @@ import org.bitcoinj.core.NetworkParameters;
 import org.bitcoinj.core.Transaction;
 import org.bitcoinj.core.TransactionOutput;
 import org.bitcoinj.core.Wallet;
+import org.bitcoinj.core.Wallet.BalanceType;
 import org.bitcoinj.core.WalletExtension;
 import org.bitcoinj.kits.WalletAppKit;
 import org.bitcoinj.params.MainNetParams;
@@ -74,7 +75,7 @@ public enum Joe {
 		
 		wallet = kit.wallet();
 		storagePipe = new StoragePipe(wallet);
-        if (TestNet3Params.get().equals(params()) && wallet.getBalance().isLessThan(Coin.CENT)) {
+        if (TestNet3Params.get().equals(params()) && wallet.getBalance(BalanceType.ESTIMATED).isLessThan(Coin.CENT)) {
         	try {
         		Utils.getTestnetCoins(DIME, wallet.currentReceiveAddress().toString());
         	} catch (Exception e) {
@@ -148,5 +149,9 @@ public enum Joe {
 
 	public KeyValue receiveData(Transaction t) {
 		return storagePipe.receiveData(t);
+	}
+
+	public List<KeyValue> receiveData(List<Transaction> txs) {
+		return storagePipe.receiveData(txs);
 	}
 }

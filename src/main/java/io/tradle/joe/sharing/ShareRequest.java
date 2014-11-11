@@ -1,5 +1,7 @@
 package io.tradle.joe.sharing;
 
+import io.tradle.joe.TransactionData;
+import io.tradle.joe.TransactionDataType;
 import io.tradle.joe.exceptions.StorageException;
 import io.tradle.joe.utils.AESUtils;
 import io.tradle.joe.utils.ECUtils;
@@ -22,6 +24,7 @@ import org.bitcoinj.core.TransactionInput;
 import org.bitcoinj.core.TransactionOutput;
 import org.bitcoinj.core.Utils;
 import org.bitcoinj.core.Wallet;
+import org.bitcoinj.core.Wallet.SendRequest;
 import org.bitcoinj.core.Wallet.SendResult;
 import org.bitcoinj.wallet.KeyChain.KeyPurpose;
 import org.spongycastle.crypto.params.KeyParameter;
@@ -106,23 +109,30 @@ public class ShareRequest {
 			throw new StorageException("transaction refused by keeper network: " + code + " " + storeResponse.response());
 		}		
 		
+		SendResult cleartextSendResult = null;
 		if (shareWith.isEmpty()) {
-			if (!storeInCleartext) {
-				ECKey newKey = wallet.freshKey(KeyPurpose.AUTHENTICATION);
-				shareWith(ECUtils.toPubKeyString(newKey));
+			ECKey key = wallet.freshKey(KeyPurpose.AUTHENTICATION);
+			if (storeInCleartext) {
+				SendRequest toSelf = SendRequest.to(key.toAddress(params), SHARING_COST);
+				TransactionUtils.addDataToTransaction(toSelf.tx, new TransactionData(TransactionDataType.CLEARTEXT_STORE, fileHash));
+				cleartextSendResult = wallet.sendCoins(toSelf);
 			}
+			else
+				shareWith(ECUtils.toPubKeyString(key));
 		}
 			
 		for (String pubKey: shareWith) {
 			doShareWith(pubKey);
 		}
 		
-		return new ShareResult(fileHashStr, results);
+		return new ShareResult(fileHashStr, results, cleartextSendResult);
 	}
 
 	private HttpResponseData store() {
+		String fileStr;
 		if (storeInCleartext) {
 			encryptedData = data;
+			fileStr = StoragePipe.fileDataToString(data);
 		}
 		else {
 			if (this.encryptionKey == null)
@@ -130,15 +140,12 @@ public class ShareRequest {
 			
 			encryptionKeyStr = StoragePipe.encryptionKeyToString(encryptionKey.getKey());
 			encryptedData = AESUtils.encrypt(data, encryptionKey);
+			fileStr = StoragePipe.ciphertextBytesToString(encryptedData);
 		}
 		
 		fileHash = StoragePipe.getStorageKeyFor(data);
 		fileHashStr = StoragePipe.keyToString(fileHash);
 		
-		String fileStr = storeInCleartext ? 
-							StoragePipe.fileDataToString(data) : 
-							StoragePipe.ciphertextBytesToString(encryptedData);
-							
 		return StoragePipe.store(fileHashStr, fileStr);
 	}
 
@@ -185,7 +192,7 @@ public class ShareRequest {
 			copy.addInput(i);
 		}
 		
-		TransactionUtils.addDataToTransaction(copy, permission.hashBytes());
+		TransactionUtils.addDataToTransaction(copy, new TransactionData(TransactionDataType.ENCRYPTED_SHARE, permission.hashBytes()));
 		SendResult result = wallet.sendCoins(Wallet.SendRequest.forTx(copy));
 		
 		Permission shareResult = new Permission(result, permission);

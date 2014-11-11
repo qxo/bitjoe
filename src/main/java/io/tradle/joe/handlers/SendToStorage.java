@@ -60,7 +60,7 @@ public class SendToStorage extends SimpleChannelInboundHandler<TransactionReques
 											 .cleartext(req.cleartext())
 											 .execute();
 		
-		jResp.add("file", Gsons.ugly().toJsonTree(new TransactionResponse(null, share.fileKey())));		
+		jResp.add("file", Gsons.ugly().toJsonTree(new TransactionResponse(share.sendResult(), share.fileKey())));		
 		
 		Map<String, Permission> results = share.results();
 		if (!results.isEmpty()) {

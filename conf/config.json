@@ -3,7 +3,7 @@
 		"folder": "wallet",
 		"name": "joeWallet"
 	},
-	"prefix": "tradle ",
+	"prefix": "tradle",
 	"maxDataBytes": 40,
 	"net": "testnet",
 	"allowSpendUnconfirmed": true,

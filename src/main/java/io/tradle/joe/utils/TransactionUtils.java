@@ -1,7 +1,7 @@
 package io.tradle.joe.utils;
 
-import io.tradle.joe.Config;
-import io.tradle.joe.Joe;
+import io.tradle.joe.TransactionData;
+import io.tradle.joe.TransactionDataType;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -19,38 +19,21 @@ import org.bitcoinj.wallet.RedeemData;
 
 public class TransactionUtils {
 
-	public static void addDataToTransaction(Transaction tx, byte[] data) {
-		Config config = Joe.JOE.config();
-    	byte[] prefixBytes = Joe.JOE.getDataPrefix();
-    	if (prefixBytes != null) {
-	    	int totalLength = prefixBytes.length + data.length;
-	    	if (totalLength > config.maxDataBytes())
-	    		throw new IllegalArgumentException("Data too long by " + (config.maxDataBytes() - prefixBytes.length - data.length) + " bytes");
-	
-	    	byte[] appAndData = new byte[Math.min(config.maxDataBytes(), totalLength)];
-	    	System.arraycopy(prefixBytes, 0, appAndData, 0, prefixBytes.length);
-	    	System.arraycopy(data, 0, appAndData, prefixBytes.length, data.length);
-	    	data = appAndData;
-    	}
-
-		tx.addOutput(new TransactionOutput(tx.getParams(), tx, Coin.ZERO, metadataToScript(data)));
+	public static void addDataToTransaction(Transaction tx, TransactionData data) {
+		tx.addOutput(new TransactionOutput(tx.getParams(), tx, Coin.ZERO, metadataToScript(data.serialize())));
 	}
 
 	public static String transactionDataToString(byte[] data) {
 		return Base58.encode(data);
 	}
 	
-	public static byte[] getDataFromTransaction(Transaction tx) {
+	public static TransactionData getDataFromTransaction(Transaction tx) {
 		TransactionOutput opReturnOutput = getOpReturnOutput(tx);
 		if (opReturnOutput == null)
 			return null;
 		
 		byte[] data = scriptToMetadata(opReturnOutput.getScriptBytes());
-    	byte[] prefixBytes = Joe.JOE.getDataPrefix();
-		if (prefixBytes != null)
-			data = Arrays.copyOfRange(data, prefixBytes.length, data.length);
-		
-		return data;
+		return TransactionData.deserialize(data);
 	}
 
 	public static TransactionOutput getOpReturnOutput(Transaction tx) {

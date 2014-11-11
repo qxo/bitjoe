@@ -2,14 +2,14 @@ package io.tradle.joe.utils;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
+import io.tradle.joe.Joe;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.function.Consumer;
 
 import org.bitcoinj.core.Sha256Hash;
 import org.bitcoinj.core.StoredBlock;
@@ -18,7 +18,10 @@ import org.bitcoinj.core.Wallet;
 import org.bitcoinj.store.BlockStore;
 import org.bitcoinj.store.BlockStoreException;
 
-public class TransactionCursor {
+import com.google.common.collect.HashMultimap;
+import com.google.common.collect.Multimap;
+
+public class TransactionRanger {
 
 	private final Wallet wallet;
 	private final BlockStore store;
@@ -27,7 +30,7 @@ public class TransactionCursor {
 	private Integer fromHeight;
 	private Integer toHeight;
 
-	public TransactionCursor(Wallet wallet, BlockStore store) {
+	public TransactionRanger(Wallet wallet, BlockStore store) {
 		this.wallet = checkNotNull(wallet);
 		this.store = checkNotNull(store);
 	}
@@ -36,7 +39,7 @@ public class TransactionCursor {
 	 * @param date - unix timestamp (seconds)
 	 * @return same cursor
 	 */
-	public TransactionCursor fromDate(int date) {
+	public TransactionRanger fromDate(int date) {
 		this.fromDate = date;
 //		if (this.toDate == null)
 //			this.toDate = (int) (System.currentTimeMillis() / 1000);
@@ -48,7 +51,7 @@ public class TransactionCursor {
 	 * @param date - unix timestamp (seconds)
 	 * @return same cursor
 	 */
-	public TransactionCursor toDate(int date) {
+	public TransactionRanger toDate(int date) {
 		this.toDate = date;
 		if (this.fromDate == null)
 			this.fromDate = 0;
@@ -56,12 +59,12 @@ public class TransactionCursor {
 		return this;
 	}
 
-	public TransactionCursor fromHeight(int height) {
+	public TransactionRanger fromHeight(int height) {
 		this.fromHeight = height;
 		return this;
 	}
 
-	public TransactionCursor toHeight(int height) {
+	public TransactionRanger toHeight(int height) {
 		this.toHeight = height;
 		if (this.fromHeight == null)
 			this.fromHeight = 0;
@@ -69,29 +72,41 @@ public class TransactionCursor {
 		return this;
 	}
 	
-	public void forEach(Consumer<Transaction> consumer) {
+	public List<Transaction> getRange() {
 		checkArgument(toDate != null || toHeight != null, "Neither height nor time bounds were set");
-		
-		Map<Integer, Transaction> timeToTransaction = new HashMap<Integer, Transaction>();
+		Multimap<Integer, Transaction> timeToTransaction = HashMultimap.create();
 		Set<Transaction> transactions = wallet.getTransactions(false);
 		for (Transaction t: transactions) {
 			Map<Sha256Hash, Integer> appearsInHashes = t.getAppearsInHashes();
-			Sha256Hash mostLikely = getBestHash(appearsInHashes);
+			int height, time;
 			StoredBlock block = null;
-			try {
-				block = store.get(mostLikely);
-			} catch (BlockStoreException e) {
-				throw new IllegalStateException("Failed to read from block store");
+			if (appearsInHashes == null) {
+				if (!Joe.isTesting())
+					continue;
+				
+				try {
+					block = store.getChainHead();
+				} catch (BlockStoreException e) {
+					continue;
+				}				
+			}
+			else {
+				Sha256Hash mostLikely = getBestHash(appearsInHashes);
+				try {
+					block = store.get(mostLikely);
+				} catch (BlockStoreException e) {
+					throw new IllegalStateException("Failed to read from block store");
+				}
 			}
 			
 			if (toHeight != null) {
-				int height = block.getHeight();
+				height = block.getHeight();
 				if (height >= fromHeight && height <= toHeight) {
 					timeToTransaction.put(height, t);
 				}
 			}
 			else {
-				int time = (int) block.getHeader().getTimeSeconds();
+				time = (int) block.getHeader().getTimeSeconds();
 				if (time >= fromDate && time < toDate) {
 					timeToTransaction.put(time, t);
 				}
@@ -102,11 +117,16 @@ public class TransactionCursor {
 		
 		List<Integer> times = new ArrayList<Integer>(timeToTransaction.keySet());
 		Collections.sort(times);
-		for (Integer time: times) {
-			consumer.accept(timeToTransaction.get(time));
+		List<Transaction> subset = new ArrayList<Transaction>();
+		for (int time: times) {
+			Collection<Transaction> txs = timeToTransaction.get(time);
+			if (txs != null)
+				subset.addAll(txs);
 		}
+		
+		return subset;
 	}
-
+	
 	private Sha256Hash getBestHash(Map<Sha256Hash, Integer> appearsInHashes) {
 		int most = -1;
 		Sha256Hash best = null;

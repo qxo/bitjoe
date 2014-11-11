@@ -4,9 +4,10 @@ import io.netty.handler.codec.http.QueryStringEncoder;
 import io.netty.util.CharsetUtil;
 import io.tradle.joe.Config;
 import io.tradle.joe.Joe;
+import io.tradle.joe.TransactionData;
+import io.tradle.joe.TransactionDataType;
 import io.tradle.joe.events.KeyValue;
 import io.tradle.joe.exceptions.StorageException;
-import io.tradle.joe.extensions.WebHooksExtension;
 import io.tradle.joe.utils.AESUtils;
 import io.tradle.joe.utils.ECUtils;
 import io.tradle.joe.utils.Gsons;
@@ -18,7 +19,9 @@ import java.math.BigInteger;
 import java.net.URISyntaxException;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.commons.codec.binary.Base64;
 import org.bitcoinj.core.AddressFormatException;
@@ -57,78 +60,108 @@ public class StoragePipe {
 	}
 
 	public KeyValue receiveData(Transaction tx) {
-		byte[] hash = TransactionUtils.getDataFromTransaction(tx);
-		if (hash == null)
+		TransactionData data = TransactionUtils.getDataFromTransaction(tx);
+		if (data == null)
 			return null;
 		
-		return receiveData(tx, hash);
+		return receiveData(tx, data);
 	}
 	
 	public List<KeyValue> receiveData(List<Transaction> txs) {
 		int numTxs = txs.size();
-		List<byte[]> hashes = new ArrayList<byte[]>();
-		for (Transaction t: txs) {
-			hashes.add(TransactionUtils.getDataFromTransaction(t));
-		}
+		List<TransactionData> tData = new ArrayList<TransactionData>();
+		List<String> hashes = new ArrayList<String>();
 
+		// build list of keys to batch query keeper for:
+		
 		StringBuilder intermediateKeys = new StringBuilder();
-		for (int i = 0; i < numTxs; i++) {
-			byte[] iHash = hashes.get(i);
-			if (iHash == null)
-				continue;
-
-			intermediateKeys.append(TransactionUtils.transactionDataToString(iHash));
+		for (Transaction t: txs) {
+			TransactionData td = TransactionUtils.getDataFromTransaction(t);
+			tData.add(td);
+			
+			String keyString = keyToString(td.data());
+			hashes.add(keyString);
+			intermediateKeys.append(keyString);
 			intermediateKeys.append(",");
 		}
-		
+
 		if (intermediateKeys.length() == 0)
 			return null;
-			
+		
 		JsonArray iFiles = fetchFiles(intermediateKeys.substring(0, intermediateKeys.length() - 1));
 		List<String> decryptionKeys = new ArrayList<String>();
 
+		// go through retrieved data and find decryption keys from intermediate files:
+		
 		for (int i = 0; i < numTxs; i++) {
 			String iFile = iFiles.get(i).getAsString();
 			String dKey = null;
 			if (iFile != null) {
 				Transaction t = txs.get(i);
-				PermissionFileData iData = getIntermediateFileData(t, iFile);
-				byte[] fileHash = keyToBytes(iData.fileHash());
-				hashes.set(i, fileHash);
-				dKey = iData.decryptionKey();
+				if (tData.get(i).type() == TransactionDataType.ENCRYPTED_SHARE) {
+					PermissionFileData iData = getIntermediateFileData(t, iFile);
+//					byte[] fileHash = keyToBytes(iData.fileHash());
+					hashes.set(i, iData.fileHash());
+					dKey = iData.decryptionKey();
+				}
 			}
 			
 			decryptionKeys.add(dKey);
 		}
+			
+		// for files that were just intermediate files, fetch the actual file they point to:
 		
 		StringBuilder keys = new StringBuilder();
 		for (int i = 0; i < numTxs; i++) {
 			String dKey = decryptionKeys.get(i);
 			if (dKey != null) {
-				keys.append(keyToString(hashes.get(i)));
+				keys.append(hashes.get(i));
 				keys.append(",");
 			}
 		}
 		
-		if (keys.length() == 0)
-			return null;
+		JsonArray files = null;
+		if (keys.length() != 0)
+			files = fetchFiles(keys.substring(0, keys.length() - 1));			
 
+		// merge the cleartext-stored files with the encrypted files to preserve order by transaction time
 		List<KeyValue> data = new ArrayList<KeyValue>();
-		JsonArray files = fetchFiles(keys.substring(0, keys.length() - 1));
-		for (int i = 0; i < numTxs; i++) {
-			String file = files.get(0).getAsString();
+		for (int i = 0, j = files.size(); i < numTxs; i++) {
 			String dKey = decryptionKeys.get(i);
-			file = decryptFile(file, dKey);
-			data.add(new KeyValue(keyToString(hashes.get(i)), file));
+			String file = null;
+			if (dKey == null) {
+				file = tryGetAsString(iFiles, i);
+				if (file != null)
+					file = decryptFile(file, dKey);
+			}
+			else {
+				file = tryGetAsString(files, j++);
+			}
+			
+			data.add(new KeyValue(hashes.get(i), file));
 		}
-		
+
 		return data;
 	}
 
-	public KeyValue receiveData(Transaction tx, byte[] intermediateFileHash) {
-		String intermediateFile = fetchFile(intermediateFileHash);
+	private static String tryGetAsString(JsonArray arr, int idx) {
+		if (arr == null)
+			return null;
+		
+		JsonElement j = arr.get(idx);
+		if (j == null)
+			return null;
+		
+		return j.getAsString();
+	}
+	
+	public KeyValue receiveData(Transaction tx, TransactionData data) {
+		String intermediateFile = fetchFile(data.data());
 		if (intermediateFile == null)
 			return null;
+
+		if (data.type() == TransactionDataType.CLEARTEXT_STORE)
+			return new KeyValue(keyToString(data.data()), intermediateFile);
 		
 		PermissionFileData iData = getIntermediateFileData(tx, intermediateFile);
 		String dKey = iData.decryptionKey();
