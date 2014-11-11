@@ -5,11 +5,15 @@ Bitjoe is the gateway to Tradle transaction network based on bitcoin. In this se
 
 `http://127.0.0.1:8080?data=json-formatted-data`
 
+(The default port is 8080, you can adjust it in conf/config.json)
+
 Learn about Bitjoe architecture in [Tradle wiki](https://github.com/urbien/Tradle/wiki)
 
 Installation
 ============
 
 1. Clone this repo from github
-2. run: java io.tradle.joe.Joe 
-3. default port is 8080, you can adjust it in conf/config.json
+2. Copy the conf directory into the build directory
+3. Run java -jar bitjoe.jar from the build directory
+
+OR, if you don't need the source code, download and run install.sh
