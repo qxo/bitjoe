@@ -3,4 +3,6 @@
 *.class
 .*
 target/
-build/
+!build/
+build/*
+!build/bitjoe.jar
