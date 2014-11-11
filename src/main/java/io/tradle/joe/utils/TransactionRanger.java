@@ -131,7 +131,10 @@ public class TransactionRanger {
 		int most = -1;
 		Sha256Hash best = null;
 		for (Sha256Hash hash: appearsInHashes.keySet()) {
-			int appearances = appearsInHashes.getOrDefault(hash, most);
+			Integer appearances = appearsInHashes.get(hash);
+			if (appearances == null)
+				appearances = 0;
+			
 			if (most == -1 || appearances > most) {
 				most = appearances;
 				best = hash;
