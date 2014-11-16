@@ -3,7 +3,7 @@ bitjoe
 
 Bitjoe is the gateway to Tradle transaction network based on bitcoin. In this sense it is a first point of contact for new blockchain apps. Bitjoe is a RESTful server, and is called like this:
 
-`http://127.0.0.1:8080/transaction?json-formatted-data&to=pubKey1,pubKey2,...`
+`http://127.0.0.1:8080/transaction?data=json-formatted-data&to=pubKey1,pubKey2,...`
 
 (The default port is 8080, you can adjust it in conf/config.json)
 
